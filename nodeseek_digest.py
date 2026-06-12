@@ -533,7 +533,16 @@ def crawl_post_details(post_id, config=None):
         
     # 2. 帖子正文 HTML
     content_el = soup.select_one('.nsk-post article.post-content, .nsk-post .post-content, .nsk-post .md-content')
-    content_html = str(content_el) if content_el else "<p>未获取到帖子正文内容。</p>"
+    content_html = ""
+    if content_el:
+        # 升级相对图片与链接
+        for img in content_el.select('img[src^="/"]'):
+            img['src'] = nodeseek_url + img['src']
+        for a in content_el.select('a[href^="/"]'):
+            a['href'] = nodeseek_url + a['href']
+        content_html = str(content_el)
+    else:
+        content_html = "<p>未获取到帖子正文内容。</p>"
     
     # 3. 评论列表解析
     comments = []
@@ -573,3 +582,162 @@ def crawl_post_details(post_id, config=None):
         "content_html": content_html,
         "comments": comments
     }
+
+def generate_post_screenshot(post_id, config=None):
+    """使用 Playwright 渲染帖子的自定义 HTML 并截取长图"""
+    if config is None:
+        config = database.get_config()
+    
+    # 1. 抓取帖子详情
+    details = crawl_post_details(post_id, config)
+    if "error" in details:
+        return {"error": details["error"]}
+        
+    db_post = database.get_post_by_id(post_id)
+    title = db_post["title"] if db_post else "NodeSeek 帖子"
+    poster_name = details.get("poster_name", "未知")
+    content_html = details.get("content_html", "")
+    nodeseek_url = config.get("nodeseek_url", "https://www.nodeseek.com")
+    
+    # 2. 格式化前 5 条评论
+    comments_html = ""
+    raw_comments = details.get("comments", [])
+    if raw_comments:
+        comments_html += '<div class="comment-title">💬 热门评论</div>'
+        for i, c in enumerate(raw_comments[:5]):
+            c_author = c.get("author", "匿名")
+            c_floor = c.get("floor", f"{i+1}#")
+            c_text_html = c.get("content_html", "")
+            comments_html += f"""
+            <div class="comment-item">
+                <div class="comment-header">{c_floor} {c_author}</div>
+                <div class="comment-text">{c_text_html}</div>
+            </div>
+            """
+            
+    # 3. 组装整页 HTML
+    full_html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <style>
+        body {{
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+          background-color: #1a1a1a;
+          color: #e5e5e5;
+          padding: 20px;
+          margin: 0;
+          width: 650px;
+          box-sizing: border-box;
+        }}
+        .container {{
+          background-color: #242424;
+          border-radius: 12px;
+          padding: 24px;
+          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+          border: 1px solid #333;
+        }}
+        .header {{
+          border-bottom: 1px solid #333;
+          padding-bottom: 16px;
+          margin-bottom: 20px;
+        }}
+        .title {{
+          font-size: 24px;
+          font-weight: bold;
+          color: #fff;
+          margin: 0 0 10px 0;
+          line-height: 1.4;
+        }}
+        .meta {{
+          font-size: 13px;
+          color: #999;
+        }}
+        .content {{
+          font-size: 16px;
+          line-height: 1.6;
+          word-wrap: break-word;
+        }}
+        .content img {{
+          max-width: 100%;
+          border-radius: 8px;
+          margin: 15px 0;
+          display: block;
+        }}
+        .comment-title {{
+          font-size: 16px;
+          font-weight: bold;
+          color: #fff;
+          border-top: 1px solid #333;
+          margin-top: 30px;
+          padding-top: 20px;
+          margin-bottom: 15px;
+        }}
+        .comment-item {{
+          font-size: 14px;
+          background-color: #2d2d2d;
+          padding: 12px;
+          border-radius: 8px;
+          margin-bottom: 12px;
+          border: 1px solid #3c3c3c;
+        }}
+        .comment-header {{
+          font-weight: bold;
+          color: #3b82f6;
+          margin-bottom: 6px;
+        }}
+        .comment-text {{
+          color: #d1d5db;
+        }}
+        .comment-text img {{
+          max-width: 100px;
+          max-height: 100px;
+          border-radius: 4px;
+          margin: 5px 0;
+          display: block;
+        }}
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1 class="title">{title}</h1>
+          <div class="meta">👤 作者: {poster_name} | 📌 帖子 ID: {post_id}</div>
+        </div>
+        <div class="content">
+          {content_html}
+        </div>
+        {comments_html}
+      </div>
+    </body>
+    </html>
+    """
+    
+    # 4. 使用 Playwright 截图
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError as e:
+        return {"error": "系统未安装 Playwright 依赖，无法生成正文长图。"}
+        
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            context = browser.new_context(viewport={"width": 650, "height": 800})
+            page = context.new_page()
+            page.set_content(full_html)
+            try:
+                page.wait_for_load_state("networkidle", timeout=8000)
+            except Exception:
+                pass
+                
+            container = page.query_selector(".container")
+            if container:
+                screenshot_bytes = container.screenshot(type="png")
+            else:
+                screenshot_bytes = page.screenshot(full_page=True, type="png")
+                
+            browser.close()
+            return {"screenshot_bytes": screenshot_bytes, "title": title}
+    except Exception as e:
+        return {"error": f"Playwright 渲染截图失败: {str(e)}"}

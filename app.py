@@ -52,6 +52,7 @@ class ConfigSchema(BaseModel):
     cron_minute: int
     interval_hours: int
     crawler_engine: str
+    forward_mode: str
     page_delay: int
     verbose_log: bool
     blocked_uids: list

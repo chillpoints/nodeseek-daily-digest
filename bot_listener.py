@@ -819,6 +819,21 @@ def _run_system_upgrade(token, chat_id, message_id):
             pip_error = pip_res.stderr or pip_res.stdout
             logger.warning(f"⚠️ pip 依赖更新警告 (非致命): {pip_error}")
             
+        # 2.5 自动安装 Playwright 浏览器依赖 (如果安装了 playwright 模块)
+        try:
+            playwright_bin = os.path.join(os.path.dirname(pip_exe), "playwright")
+            if not os.path.exists(playwright_bin):
+                playwright_bin = "playwright"
+            logger.info("🤖 正在尝试安装 Playwright Chromium 浏览器依赖...")
+            # 运行 playwright install chromium 安装无头浏览器二进制
+            pw_res = subprocess.run([playwright_bin, "install", "chromium"], capture_output=True, text=True, cwd=project_dir, timeout=120)
+            if pw_res.returncode == 0:
+                logger.info("🎉 Playwright Chromium 安装成功！")
+            else:
+                logger.warning(f"⚠️ Playwright Chromium 安装可能失败: {pw_res.stderr or pw_res.stdout}")
+        except Exception as ex:
+            logger.warning(f"⚠️ 自动安装 Playwright 浏览器时发生异常: {ex}")
+            
         # 3. 发送重启提醒并退出进程
         text = (
             "✅ <b>系统自动更新成功！</b>\n\n"
@@ -905,21 +920,46 @@ def _get_stars_page_data(page=1):
     return text, {"inline_keyboard": keyboard}
 
 def _run_send_post_content(token, chat_id, post_id):
-    """在后台线程抓取帖子详细正文和评论并推送到 Telegram 客户端"""
+    """在后台线程抓取帖子详细正文和评论并推送到 Telegram 客户端 (支持文字与图片双模式)"""
     logger.info(f"🤖 正在获取帖子 {post_id} 详情并发送...")
     try:
-        # 1. 尝试获取本地缓存的标题
+        # 读取系统配置
+        config = database.get_config()
         db_post = database.get_post_by_id(post_id)
+        title = db_post["title"] if db_post else "未知标题"
         
-        # 2. 从爬虫模块获取最新帖子详情 (含正文 HTML 与评论集)
+        forward_mode = config.get("forward_mode", "text")
+        
+        # 1. 长图模式：使用 Playwright 渲染并发送整张图片
+        if forward_mode == "image":
+            import nodeseek_digest
+            res_dict = nodeseek_digest.generate_post_screenshot(post_id, config)
+            if "error" in res_dict:
+                _send_message(token, chat_id, f"❌ 生成长图预览失败：\n<code>{res_dict['error']}</code>")
+                return
+            
+            photo_bytes = res_dict["screenshot_bytes"]
+            url = f"https://api.telegram.org/bot{token}/sendPhoto"
+            files = {"photo": ("screenshot.png", photo_bytes, "image/png")}
+            data = {
+                "chat_id": chat_id,
+                "caption": f"📖 <b>NodeSeek 帖子正文预览</b>\n\n📌 <b>标题：</b><a href='https://www.nodeseek.com/post-{post_id}-1'>{title}</a>",
+                "parse_mode": "HTML"
+            }
+            res = requests.post(url, data=data, files=files, impersonate="chrome120", timeout=30)
+            if res.status_code != 200:
+                logger.error(f"❌ 发送正文长图失败，状态码: {res.status_code}, 响应: {res.text}")
+                _send_message(token, chat_id, f"❌ 发送截图失败，TG 响应: <code>{res.text}</code>")
+            return
+
+        # 2. 文本模式：发送纯文本并附带原始插图媒体组
         import nodeseek_digest
-        details = nodeseek_digest.crawl_post_details(post_id)
+        details = nodeseek_digest.crawl_post_details(post_id, config)
         
         if "error" in details:
             _send_message(token, chat_id, f"❌ 抓取帖子内容失败：\n<code>{details['error']}</code>")
             return
             
-        title = db_post["title"] if db_post else "未知标题"
         poster_name = details.get("poster_name", "未知")
         
         # 3. 提取纯文本正文并截断
@@ -968,14 +1008,59 @@ def _run_send_post_content(token, chat_id, post_id):
             f"----------------------------------------\n"
             f"{body_text}\n"
             f"----------------------------------------\n\n"
-            f"🖼️ <b>正文插图：</b>\n"
+            f"🖼️ <b>正文插图链接：</b>\n"
             f"{images_list_text}\n\n"
             f"💬 <b>热门评论 (展示前 5 条)：</b>\n\n"
             f"{comments_text}"
         )
         
+        # 先发送文字内容
         _send_message(token, chat_id, text)
         
+        # 8. 如果有图片，并发/顺序下载并以 Media Group 或单张 Photo 发送
+        if images:
+            media_group = []
+            files = {}
+            downloaded_count = 0
+            nodeseek_url = config.get("nodeseek_url", "https://www.nodeseek.com")
+            
+            for img_url in images[:10]: # Telegram 限制每次最多 10 张
+                try:
+                    if img_url.startswith("/"):
+                        img_url = nodeseek_url + img_url
+                    
+                    # 过滤表情包和头像等小图
+                    if "emoji" in img_url or "avatar" in img_url or "/static/image/common/" in img_url:
+                        continue
+                        
+                    logger.info(f"正在下载帖子图片以供转发: {img_url}")
+                    img_res = requests.get(img_url, impersonate="chrome120", timeout=10)
+                    if img_res.status_code == 200 and len(img_res.content) > 1024: # 大于 1KB
+                        file_key = f"file{downloaded_count}"
+                        files[file_key] = (f"image_{downloaded_count}.jpg", img_res.content, "image/jpeg")
+                        media_group.append({
+                            "type": "photo",
+                            "media": f"attach://{file_key}"
+                        })
+                        downloaded_count += 1
+                except Exception as ex:
+                    logger.warning(f"下载图片失败: {img_url} | {ex}")
+                    
+            if downloaded_count == 1:
+                # 发送单张照片
+                photo_url = f"https://api.telegram.org/bot{token}/sendPhoto"
+                try:
+                    requests.post(photo_url, data={"chat_id": chat_id}, files={"photo": files["file0"]}, impersonate="chrome120", timeout=15)
+                except Exception as ex:
+                    logger.error(f"发送单张插图失败: {ex}")
+            elif downloaded_count > 1:
+                # 发送 Media Group
+                album_url = f"https://api.telegram.org/bot{token}/sendMediaGroup"
+                try:
+                    requests.post(album_url, data={"chat_id": chat_id, "media": json.dumps(media_group)}, files=files, impersonate="chrome120", timeout=30)
+                except Exception as ex:
+                    logger.error(f"发送插图相册失败: {ex}")
+                    
     except Exception as e:
         logger.error(f"❌ 发送帖子 {post_id} 内容异常: {e}")
         _send_message(token, chat_id, f"❌ 展示帖子详情时遭遇崩溃：\n<code>{str(e)}</code>")

@@ -86,6 +86,7 @@ def init_db():
         "cron_minute": "30",
         "interval_hours": "4",
         "crawler_engine": "curl_cffi", # 'curl_cffi', 'playwright'
+        "forward_mode": "text",        # 'text' or 'image'
         "page_delay": "2",             # 防风控间隔 (秒)
         "verbose_log": "0",            # 是否开启详细日志 (0-关闭, 1-开启)
         "blocked_uids": "",             # 拉黑过滤特定发帖人 UID (以逗号分隔)

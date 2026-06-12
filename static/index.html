@@ -766,6 +766,13 @@
                                 <option value="playwright">Playwright (后备: 无头浏览器模式)</option>
                             </select>
                         </div>
+                        <div class="form-group">
+                            <label for="forward_mode">帖子详情转发模式 (Telegram 预览)</label>
+                            <select class="form-control" id="forward_mode">
+                                <option value="text">文字排版 + 多图相册 (Text + Photo Album)</option>
+                                <option value="image">智能排版渲染长图 (Playwright HTML Render)</option>
+                            </select>
+                        </div>
 
                         <!-- 时间衰减设置 -->
                         <div style="margin-top: 20px; border-top: 1px solid rgba(16, 16, 16, 0.08); padding-top: 15px;">
@@ -1093,6 +1100,7 @@
             document.getElementById('cron_minute').value = data.cron_minute !== undefined ? data.cron_minute : 30;
             document.getElementById('interval_hours').value = data.interval_hours || 4;
             document.getElementById('crawler_engine').value = data.crawler_engine || 'curl_cffi';
+            document.getElementById('forward_mode').value = data.forward_mode || 'text';
             document.getElementById('max_pages').value = data.max_pages || 5;
             document.getElementById('page_delay').value = data.page_delay !== undefined ? data.page_delay : 2;
             document.getElementById('verbose_log').value = data.verbose_log ? 'true' : 'false';
@@ -1234,7 +1242,8 @@
             ai_filter_enabled: document.getElementById('ai_filter_enabled').value === 'true',
             ai_filter_prompt: document.getElementById('ai_filter_prompt').value.trim(),
             ai_summary_enabled: document.getElementById('ai_summary_enabled').value === 'true',
-            ai_summary_prompt: document.getElementById('ai_summary_prompt').value.trim()
+            ai_summary_prompt: document.getElementById('ai_summary_prompt').value.trim(),
+            forward_mode: document.getElementById('forward_mode').value
         };
         
         try {
