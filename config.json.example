@@ -1,0 +1,16 @@
+{
+  "tg_bot_token": "YOUR_TELEGRAM_BOT_TOKEN",
+  "tg_chat_id": "YOUR_TELEGRAM_CHAT_ID",
+  "nodeseek_url": "https://www.nodeseek.com",
+  "max_pages": 5,
+  "lucky_keywords": [
+    "抽奖",
+    "送码",
+    "送鸡腿",
+    "卡密",
+    "免费送",
+    "送个",
+    "福利",
+    "送台"
+  ]
+}
