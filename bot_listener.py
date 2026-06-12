@@ -940,13 +940,16 @@ def _run_send_post_content(token, chat_id, post_id):
             
             photo_bytes = res_dict["screenshot_bytes"]
             url = f"https://api.telegram.org/bot{token}/sendPhoto"
-            files = {"photo": ("screenshot.png", photo_bytes, "image/png")}
-            data = {
-                "chat_id": chat_id,
-                "caption": f"📖 <b>NodeSeek 帖子正文预览</b>\n\n📌 <b>标题：</b><a href='https://www.nodeseek.com/post-{post_id}-1'>{title}</a>",
-                "parse_mode": "HTML"
-            }
-            res = requests.post(url, data=data, files=files, impersonate="chrome120", timeout=30)
+            
+            from curl_cffi import CurlMime
+            mp = CurlMime()
+            mp.addpart(name="chat_id", data=str(chat_id).encode("utf-8"))
+            caption = f"📖 <b>NodeSeek 帖子正文预览</b>\n\n📌 <b>标题：</b><a href='https://www.nodeseek.com/post-{post_id}-1'>{title}</a>"
+            mp.addpart(name="caption", data=caption.encode("utf-8"))
+            mp.addpart(name="parse_mode", data=b"HTML")
+            mp.addpart(name="photo", content_type="image/png", filename="screenshot.png", data=photo_bytes)
+            
+            res = requests.post(url, multipart=mp, impersonate="chrome120", timeout=30)
             if res.status_code != 200:
                 logger.error(f"❌ 发送正文长图失败，状态码: {res.status_code}, 响应: {res.text}")
                 _send_message(token, chat_id, f"❌ 发送截图失败，TG 响应: <code>{res.text}</code>")
@@ -1050,14 +1053,25 @@ def _run_send_post_content(token, chat_id, post_id):
                 # 发送单张照片
                 photo_url = f"https://api.telegram.org/bot{token}/sendPhoto"
                 try:
-                    requests.post(photo_url, data={"chat_id": chat_id}, files={"photo": files["file0"]}, impersonate="chrome120", timeout=15)
+                    from curl_cffi import CurlMime
+                    mp = CurlMime()
+                    mp.addpart(name="chat_id", data=str(chat_id).encode("utf-8"))
+                    filename, content, content_type = files["file0"]
+                    mp.addpart(name="photo", content_type=content_type, filename=filename, data=content)
+                    requests.post(photo_url, multipart=mp, impersonate="chrome120", timeout=15)
                 except Exception as ex:
                     logger.error(f"发送单张插图失败: {ex}")
             elif downloaded_count > 1:
                 # 发送 Media Group
                 album_url = f"https://api.telegram.org/bot{token}/sendMediaGroup"
                 try:
-                    requests.post(album_url, data={"chat_id": chat_id, "media": json.dumps(media_group)}, files=files, impersonate="chrome120", timeout=30)
+                    from curl_cffi import CurlMime
+                    mp = CurlMime()
+                    mp.addpart(name="chat_id", data=str(chat_id).encode("utf-8"))
+                    mp.addpart(name="media", data=json.dumps(media_group).encode("utf-8"))
+                    for file_key, (filename, content, content_type) in files.items():
+                        mp.addpart(name=file_key, content_type=content_type, filename=filename, data=content)
+                    requests.post(album_url, multipart=mp, impersonate="chrome120", timeout=30)
                 except Exception as ex:
                     logger.error(f"发送插图相册失败: {ex}")
                     
