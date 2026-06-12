@@ -10,16 +10,16 @@
     
     <style>
         :root {
-            --bg-color: #0b0f19;
-            --card-bg: rgba(17, 25, 40, 0.75);
-            --card-border: rgba(255, 255, 255, 0.08);
-            --primary-gradient: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
-            --accent-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-            --text-main: #f3f4f6;
-            --text-muted: #9ca3af;
-            --success: #10b981;
-            --danger: #ef4444;
-            --cyan-glow: rgba(0, 242, 254, 0.15);
+            --bg-color: #FFFDF5;
+            --card-bg: #FFFFFF;
+            --card-border: #E6E4DC;
+            --primary-gradient: linear-gradient(135deg, #CB4B16 0%, #E05D2B 100%);
+            --accent-gradient: linear-gradient(135deg, #2AA198 0%, #268BD2 100%);
+            --text-main: #101010;
+            --text-muted: #586E75;
+            --success: #859900;
+            --danger: #DC322F;
+            --cyan-glow: rgba(203, 75, 22, 0.12);
         }
 
         * {
@@ -35,8 +35,8 @@
             overflow-x: hidden;
             min-height: 100vh;
             background-image: 
-                radial-gradient(circle at 10% 20%, rgba(0, 242, 254, 0.08) 0%, transparent 40%),
-                radial-gradient(circle at 85% 80%, rgba(245, 87, 108, 0.08) 0%, transparent 40%);
+                radial-gradient(circle at 10% 20%, rgba(203, 75, 22, 0.03) 0%, transparent 40%),
+                radial-gradient(circle at 85% 80%, rgba(42, 161, 152, 0.03) 0%, transparent 40%);
             background-attachment: fixed;
         }
 
@@ -58,7 +58,7 @@
             border-radius: 20px;
             backdrop-filter: blur(16px);
             margin-bottom: 30px;
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+            box-shadow: 0 8px 24px 0 rgba(0, 0, 0, 0.05);
         }
 
         .logo {
@@ -77,10 +77,10 @@
         .nav-tabs {
             display: flex;
             gap: 10px;
-            background: rgba(255, 255, 255, 0.03);
+            background: rgba(16, 16, 16, 0.03);
             padding: 5px;
             border-radius: 12px;
-            border: 1px solid rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(16, 16, 16, 0.05);
         }
 
         .tab-btn {
@@ -99,11 +99,11 @@
 
         .tab-btn:hover {
             color: var(--text-main);
-            background: rgba(255, 255, 255, 0.05);
+            background: rgba(16, 16, 16, 0.05);
         }
 
         .tab-btn.active {
-            color: var(--bg-color);
+            color: #FFFDF5;
             background: var(--primary-gradient);
             box-shadow: 0 4px 15px var(--cyan-glow);
         }
@@ -130,7 +130,7 @@
             border-radius: 20px;
             padding: 25px;
             backdrop-filter: blur(16px);
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
+            box-shadow: 0 8px 24px 0 rgba(0, 0, 0, 0.04);
             margin-bottom: 25px;
         }
 
@@ -141,7 +141,7 @@
             display: flex;
             align-items: center;
             gap: 10px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            border-bottom: 1px solid rgba(16, 16, 16, 0.08);
             padding-bottom: 12px;
         }
 
@@ -154,7 +154,7 @@
         }
 
         .stat-card {
-            background: rgba(255, 255, 255, 0.02);
+            background: rgba(16, 16, 16, 0.01);
             border: 1px solid var(--card-border);
             border-radius: 16px;
             padding: 20px;
@@ -166,7 +166,7 @@
 
         .stat-card:hover {
             transform: translateY(-3px);
-            border-color: rgba(0, 242, 254, 0.3);
+            border-color: rgba(203, 75, 22, 0.3);
         }
 
         .stat-icon {
@@ -175,7 +175,7 @@
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             padding: 12px;
-            background-color: rgba(255, 255, 255, 0.03);
+            background-color: rgba(16, 16, 16, 0.02);
             border-radius: 12px;
         }
 
@@ -193,16 +193,16 @@
 
         /* Console Log Window */
         .console-window {
-            background: #050811;
-            border: 1px solid #1f2937;
+            background: #F5F2EB;
+            border: 1px solid #D3CFC9;
             border-radius: 12px;
             padding: 15px;
             font-family: 'Space Grotesk', monospace;
             font-size: 13px;
-            color: #00f2fe;
+            color: #101010;
             height: 350px;
             overflow-y: auto;
-            box-shadow: inset 0 0 10px rgba(0,0,0,0.8);
+            box-shadow: inset 0 0 8px rgba(0,0,0,0.05);
             line-height: 1.6;
         }
 
@@ -238,13 +238,13 @@
         }
 
         .btn.btn-secondary {
-            background: rgba(255, 255, 255, 0.08);
+            background: rgba(16, 16, 16, 0.04);
             color: var(--text-main);
             border: 1px solid var(--card-border);
         }
 
         .btn.btn-secondary:hover {
-            background: rgba(255, 255, 255, 0.15);
+            background: rgba(16, 16, 16, 0.08);
             box-shadow: none;
         }
 
@@ -269,7 +269,7 @@
         }
 
         .form-control {
-            background: rgba(255, 255, 255, 0.03);
+            background: rgba(16, 16, 16, 0.01);
             border: 1px solid var(--card-border);
             border-radius: 8px;
             padding: 12px;
@@ -281,9 +281,9 @@
 
         .form-control:focus {
             outline: none;
-            border-color: #00f2fe;
+            border-color: #CB4B16;
             box-shadow: 0 0 10px var(--cyan-glow);
-            background: rgba(255, 255, 255, 0.06);
+            background: rgba(255, 255, 255, 0.85);
         }
 
         textarea.form-control {
@@ -306,7 +306,7 @@
 
         .feed-list {
             overflow-y: auto;
-            border-right: 1px solid rgba(255, 255, 255, 0.05);
+            border-right: 1px solid rgba(16, 16, 16, 0.06);
             padding-right: 15px;
             display: flex;
             flex-direction: column;
@@ -314,7 +314,7 @@
         }
 
         .feed-card {
-            background: rgba(255, 255, 255, 0.02);
+            background: rgba(16, 16, 16, 0.015);
             border: 1px solid var(--card-border);
             border-radius: 12px;
             padding: 16px;
@@ -323,8 +323,8 @@
         }
 
         .feed-card:hover, .feed-card.active {
-            background: rgba(0, 242, 254, 0.05);
-            border-color: rgba(0, 242, 254, 0.4);
+            background: rgba(203, 75, 22, 0.06);
+            border-color: rgba(203, 75, 22, 0.35);
             transform: translateX(4px);
         }
 
@@ -383,7 +383,7 @@
             display: flex;
             gap: 15px;
             align-items: center;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            border-bottom: 1px solid rgba(16, 16, 16, 0.08);
             padding-bottom: 20px;
         }
 
@@ -391,7 +391,7 @@
             width: 48px;
             height: 48px;
             border-radius: 50%;
-            border: 2px solid rgba(0, 242, 254, 0.3);
+            border: 2px solid rgba(203, 75, 22, 0.3);
             object-fit: cover;
         }
 
@@ -412,7 +412,7 @@
             font-size: 15px;
             line-height: 1.7;
             word-wrap: break-word;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            border-bottom: 1px solid rgba(16, 16, 16, 0.08);
             padding-bottom: 35px;
         }
 
@@ -424,11 +424,11 @@
             max-width: 100%;
             border-radius: 8px;
             margin: 10px 0;
-            border: 1px solid rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(16, 16, 16, 0.05);
         }
 
         .post-body a {
-            color: #00f2fe;
+            color: #CB4B16;
             text-decoration: none;
         }
 
@@ -438,19 +438,19 @@
 
         .post-body code {
             font-family: 'Space Grotesk', monospace;
-            background: rgba(255,255,255,0.06);
+            background: rgba(16,16,16,0.06);
             padding: 3px 6px;
             border-radius: 4px;
             font-size: 14px;
         }
 
         .post-body pre {
-            background: #050811;
+            background: #F5F2EB;
             padding: 15px;
             border-radius: 8px;
             overflow-x: auto;
             margin: 15px 0;
-            border: 1px solid rgba(255,255,255,0.05);
+            border: 1px solid #D3CFC9;
         }
 
         .post-body pre code {
@@ -459,7 +459,7 @@
         }
 
         .post-body blockquote {
-            border-left: 4px solid #00f2fe;
+            border-left: 4px solid #CB4B16;
             padding-left: 15px;
             color: var(--text-muted);
             margin: 15px 0;
@@ -474,8 +474,8 @@
         }
 
         .comment-item {
-            background: rgba(255, 255, 255, 0.015);
-            border: 1px solid rgba(255, 255, 255, 0.05);
+            background: rgba(16, 16, 16, 0.015);
+            border: 1px solid rgba(16, 16, 16, 0.05);
             border-radius: 12px;
             padding: 15px;
             display: flex;
@@ -531,14 +531,14 @@
             width: 8px;
         }
         ::-webkit-scrollbar-track {
-            background: rgba(0,0,0,0.1);
+            background: rgba(16, 16, 16, 0.03);
         }
         ::-webkit-scrollbar-thumb {
-            background: rgba(255,255,255,0.1);
+            background: rgba(16, 16, 16, 0.12);
             border-radius: 4px;
         }
         ::-webkit-scrollbar-thumb:hover {
-            background: rgba(255,255,255,0.2);
+            background: rgba(16, 16, 16, 0.22);
         }
     </style>
 </head>
@@ -687,6 +687,13 @@
                             <input type="number" class="form-control" id="page_delay" min="0" max="10">
                         </div>
                         <div class="form-group">
+                            <label for="verbose_log">控制台输出详细抓取日志</label>
+                            <select class="form-control" id="verbose_log">
+                                <option value="false">关闭 (仅展示关键信息)</option>
+                                <option value="true">开启 (输出每页解析和过滤明细)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
                             <label for="lucky_keywords">抽奖无意义帖过滤词 (以逗号分隔)</label>
                             <textarea class="form-control" id="lucky_keywords"></textarea>
                         </div>
@@ -775,6 +782,7 @@
             document.getElementById('crawler_engine').value = data.crawler_engine || 'curl_cffi';
             document.getElementById('max_pages').value = data.max_pages || 5;
             document.getElementById('page_delay').value = data.page_delay !== undefined ? data.page_delay : 2;
+            document.getElementById('verbose_log').value = data.verbose_log ? 'true' : 'false';
             document.getElementById('lucky_keywords').value = (data.lucky_keywords || []).join(', ');
             
             // Set Dashboard indicators
@@ -816,7 +824,8 @@
             cron_minute: parseInt(document.getElementById('cron_minute').value) || 0,
             interval_hours: parseInt(document.getElementById('interval_hours').value) || 4,
             crawler_engine: document.getElementById('crawler_engine').value,
-            page_delay: parseInt(document.getElementById('page_delay').value) || 0
+            page_delay: parseInt(document.getElementById('page_delay').value) || 0,
+            verbose_log: document.getElementById('verbose_log').value === 'true'
         };
         
         try {
@@ -912,7 +921,7 @@
                             <span><i class="fa-regular fa-eye"></i> ${post.views}</span>
                             <span><i class="fa-regular fa-comment"></i> ${post.comments}</span>
                         </div>
-                        <span style="color:#00f2fe; font-weight:700;"><i class="fa-solid fa-chart-line"></i> ${post.score}</span>
+                        <span style="color:#CB4B16; font-weight:700;"><i class="fa-solid fa-chart-line"></i> ${post.score}</span>
                     </div>
                 `;
                 container.appendChild(card);

@@ -52,6 +52,7 @@ class ConfigSchema(BaseModel):
     interval_hours: int
     crawler_engine: str
     page_delay: int
+    verbose_log: bool
 
 @app.on_event("startup")
 def on_startup():

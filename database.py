@@ -52,7 +52,8 @@ def init_db():
         "cron_minute": "30",
         "interval_hours": "4",
         "crawler_engine": "curl_cffi", # 'curl_cffi', 'playwright'
-        "page_delay": "2"             # 防风控间隔 (秒)
+        "page_delay": "2",             # 防风控间隔 (秒)
+        "verbose_log": "0"             # 是否开启详细日志 (0-关闭, 1-开启)
     }
     
     for k, v in default_config.items():
@@ -75,6 +76,8 @@ def get_config():
             config[key] = [x.strip() for x in val.split(",") if x.strip()]
         elif key in ["max_pages", "cron_hour", "cron_minute", "interval_hours", "page_delay"]:
             config[key] = int(val) if val.isdigit() else 0
+        elif key == "verbose_log":
+            config[key] = (val == "1" or val.lower() == "true")
         else:
             config[key] = val
     return config
