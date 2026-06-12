@@ -182,5 +182,14 @@ def get_recent_hot_posts(hours=24, limit=10):
         conn.close()
         return [dict(r) for r in rows]
 
+def clear_posts():
+    """清空 posts 表中的所有历史热帖数据"""
+    with db_lock:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM posts")
+        conn.commit()
+        conn.close()
+
 # 初始化数据库
 init_db()

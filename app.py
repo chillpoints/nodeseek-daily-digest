@@ -102,6 +102,15 @@ def trigger_push(background_tasks: BackgroundTasks):
     background_tasks.add_task(nodeseek_digest.push_recent_hot_posts)
     return {"status": "success", "message": "历史热帖推送任务已成功在后台启动。"}
 
+@app.post("/api/posts/clear")
+def clear_local_posts():
+    try:
+        database.clear_posts()
+        logging.info("🧹 已清空本地数据库中的历史热贴数据。")
+        return {"status": "success", "message": "本地历史热帖已成功清空。"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"清空失败: {str(e)}")
+
 @app.get("/api/post/{post_id}")
 def fetch_post_details(post_id: str):
     details = nodeseek_digest.crawl_post_details(post_id)
