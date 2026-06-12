@@ -152,5 +152,23 @@ def update_posts_push_status(post_ids, status):
         conn.commit()
         conn.close()
 
+def get_recent_hot_posts(hours=24, limit=10):
+    """获取过去指定小时内录入的、热度前 limit 的帖子"""
+    from datetime import datetime, timedelta
+    with db_lock:
+        conn = get_db()
+        cursor = conn.cursor()
+        threshold_time = (datetime.now() - timedelta(hours=hours)).strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute("""
+        SELECT id, title, url, views, comments, score, crawler_date
+        FROM posts
+        WHERE crawler_date >= ?
+        ORDER BY score DESC
+        LIMIT ?
+        """, (threshold_time, limit))
+        rows = cursor.fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+
 # 初始化数据库
 init_db()

@@ -94,6 +94,12 @@ def trigger_run(background_tasks: BackgroundTasks):
     background_tasks.add_task(nodeseek_digest.push_pending_digests)
     return {"status": "success", "message": "抓取与推送任务已成功在后台顺序启动。"}
 
+@app.post("/api/push")
+def trigger_push(background_tasks: BackgroundTasks):
+    logging.info("⚡ 控制面板触发手动执行单独推送历史热帖...")
+    background_tasks.add_task(nodeseek_digest.push_recent_hot_posts)
+    return {"status": "success", "message": "历史热帖推送任务已成功在后台启动。"}
+
 @app.get("/api/post/{post_id}")
 def fetch_post_details(post_id: str):
     details = nodeseek_digest.crawl_post_details(post_id)

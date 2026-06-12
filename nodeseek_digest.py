@@ -180,8 +180,8 @@ def run_digest_job(config=None):
     else:
         logger.warning("⚠️ 未筛选出符合热度要求的有效帖子。")
 
-def send_to_telegram(posts, token, chat_id):
-    """推送 HTML 目录至 Telegram 机器人"""
+def send_to_telegram(posts, token, chat_id_str):
+    """推送 HTML 目录至 Telegram 机器人 (支持逗号分隔多个 ID 广播)"""
     date_str = datetime.now().strftime("%Y-%m-%d %H:%M")
     html_msg = f"<b>🔥 NodeSeek 今日热帖订阅</b>\n"
     html_msg += f"<i>📅 生成时间: {date_str} (已自动过滤抽奖帖)</i>\n\n"
@@ -190,25 +190,34 @@ def send_to_telegram(posts, token, chat_id):
         html_msg += f"{index + 1}. <b><a href='{post['url']}'>{post['title']}</a></b>\n"
         html_msg += f"    👀 {post['views']} 阅读 | 💬 {post['comments']} 评论 | 📈 热度值: <b>{post['score']}</b>\n\n"
         
-    telegram_url = f"https://api.telegram.org/bot{token}/sendMessage"
-    payload = {
-        "chat_id": chat_id,
-        "text": html_msg,
-        "parse_mode": "HTML",
-        "disable_web_page_preview": True
-    }
-    
-    try:
-        res = requests.post(telegram_url, json=payload, impersonate="chrome120", timeout=10)
-        if res.status_code == 200:
-            logger.info("🎉 Telegram 消息推送成功！")
-            return True
-        else:
-            logger.error(f"❌ 推送失败，TG 响应: {res.text}")
-            return False
-    except Exception as e:
-        logger.error(f"❌ 推送请求异常: {e}")
+    # 切分可能包含的多个 ID (支持中英文逗号)
+    chat_ids = [c.strip() for c in re.split(r'[,\uff0c]', str(chat_id_str)) if c.strip()]
+    if not chat_ids:
+        logger.error("❌ 未配置有效的 Telegram Chat ID！")
         return False
+        
+    telegram_url = f"https://api.telegram.org/bot{token}/sendMessage"
+    
+    success_count = 0
+    for cid in chat_ids:
+        logger.info(f"📡 正在向目标 {cid} 发送推送通知...")
+        payload = {
+            "chat_id": cid,
+            "text": html_msg,
+            "parse_mode": "HTML",
+            "disable_web_page_preview": True
+        }
+        try:
+            res = requests.post(telegram_url, json=payload, impersonate="chrome120", timeout=10)
+            if res.status_code == 200:
+                logger.info(f"🎉 目标 {cid} 推送成功！")
+                success_count += 1
+            else:
+                logger.error(f"❌ 目标 {cid} 推送失败，TG 响应: {res.text}")
+        except Exception as e:
+            logger.error(f"❌ 目标 {cid} 推送请求异常: {e}")
+            
+    return success_count > 0
 
 def push_pending_digests(config=None):
     """读取未推送的帖子，发送至 Telegram 并更新推送状态"""
@@ -234,6 +243,35 @@ def push_pending_digests(config=None):
         post_ids = [p["id"] for p in pending_posts]
         database.update_posts_push_status(post_ids, 1)
         logger.info(f"💾 已将 {len(post_ids)} 个帖子在数据库中的推送状态更新为已推送。")
+
+def push_recent_hot_posts(config=None):
+    """单独推送过去 24 小时的热帖（不重新爬取）"""
+    logger.info("📡 手动触发：开始单独推送 24h 内的历史热帖...")
+    if config is None:
+        config = database.get_config()
+        
+    tg_token = config.get("tg_bot_token")
+    chat_id = config.get("tg_chat_id")
+    
+    if not tg_token or not chat_id:
+        logger.warning("ℹ️ 未配置 Telegram Bot 参数，无法执行单独推送任务。")
+        return False
+        
+    posts = database.get_recent_hot_posts(hours=24, limit=10)
+    if not posts:
+        logger.warning("⚠️ 数据库中没有过去 24 小时内抓取到的历史热帖数据，跳过推送。")
+        return False
+        
+    logger.info(f"💾 数据库已筛选出过去 24h 的 {len(posts)} 个历史热帖，准备推送...")
+    success = send_to_telegram(posts, tg_token, chat_id)
+    if success:
+        post_ids = [p["id"] for p in posts]
+        database.update_posts_push_status(post_ids, 1)
+        logger.info("🎉 历史热帖已成功发送到所有指定的 Telegram ID！")
+        return True
+    else:
+        logger.error("❌ 历史热帖推送全部失败。")
+        return False
 
 def crawl_post_details(post_id, config=None):
     """动态拉取某一帖子具体详情页（正文及评论集，保持原本 HTML 并通过 JSON 返回）"""
