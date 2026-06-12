@@ -41,6 +41,15 @@ def init_db():
         author_uid TEXT
     )
     """)
+    # 建立收藏表
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS stars (
+        post_id TEXT PRIMARY KEY,
+        title TEXT,
+        url TEXT,
+        star_time TEXT
+    )
+    """)
     conn.commit()
     
     # 动态为旧版数据库迁移新增 ai_summary 字段
@@ -258,6 +267,52 @@ def clear_posts():
         cursor.execute("DELETE FROM posts")
         conn.commit()
         conn.close()
+
+# ==========================================
+# 🆕 以下为新增的收藏夹管理数据库操作
+# ==========================================
+
+def add_star(post_id, title, url):
+    """将帖子加入收藏夹"""
+    with db_lock:
+        conn = get_db()
+        cursor = conn.cursor()
+        date_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute("""
+        INSERT OR REPLACE INTO stars (post_id, title, url, star_time)
+        VALUES (?, ?, ?, ?)
+        """, (post_id, title, url, date_str))
+        conn.commit()
+        conn.close()
+
+def remove_star(post_id):
+    """从收藏夹中移除帖子"""
+    with db_lock:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM stars WHERE post_id = ?", (post_id,))
+        conn.commit()
+        conn.close()
+
+def is_starred(post_id):
+    """检测指定帖子是否已被收藏"""
+    with db_lock:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1 FROM stars WHERE post_id = ?", (post_id,))
+        row = cursor.fetchone()
+        conn.close()
+        return row is not None
+
+def get_starred_posts():
+    """获取所有已收藏的帖子 (按收藏时间倒序)"""
+    with db_lock:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT post_id, title, url, star_time FROM stars ORDER BY star_time DESC")
+        rows = cursor.fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
 
 # 初始化数据库
 init_db()

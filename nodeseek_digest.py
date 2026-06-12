@@ -410,13 +410,15 @@ def send_to_telegram(posts, token, chat_id_str):
         
     # 构建 Inline Keyboard 交互式按钮
     keyboard_rows = []
+    row = []
     for index, post in enumerate(posts):
         pid = post['id']
-        keyboard_rows.append([
-            {"text": f"#{index + 1} 👍", "callback_data": f"up:{pid}"},
-            {"text": f"#{index + 1} 👎", "callback_data": f"down:{pid}"},
-            {"text": f"#{index + 1} 🚫 屏蔽作者", "callback_data": f"block:{pid}"}
-        ])
+        row.append({"text": f"⭐ #{index + 1} 收藏", "callback_data": f"star:{pid}"})
+        if len(row) == 3:
+            keyboard_rows.append(row)
+            row = []
+    if row:
+        keyboard_rows.append(row)
     reply_markup = {"inline_keyboard": keyboard_rows}
 
     # 切分可能包含的多个 ID (支持中英文逗号)
