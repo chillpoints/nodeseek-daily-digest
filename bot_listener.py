@@ -111,7 +111,7 @@ def _handle_callback(callback_query, token):
             
         cmd, post_id = parts
         
-        # 3. 处理收藏夹回调
+        # 3. 处理交互按钮回调
         if cmd == "star":
             db_post = database.get_post_by_id(post_id)
             title = db_post["title"] if db_post else "NodeSeek 帖子"
@@ -127,6 +127,31 @@ def _handle_callback(callback_query, token):
             _answer_callback(token, callback_id, alert_msg)
             # 反转按钮高亮状态
             _update_message_star_button(token, chat_id, message_id, callback_query.get("message", {}).get("reply_markup"), data_str)
+            return
+            
+        elif cmd == "content":
+            _answer_callback(token, callback_id, "📖 正在拉取正文预览...")
+            # 异步执行详情拉取发送，防接口超时
+            thread = threading.Thread(target=_run_send_post_content, args=(token, chat_id, post_id), daemon=True)
+            thread.start()
+            return
+            
+        elif cmd == "block":
+            category, author_uid = database.get_post_category_and_uid(post_id)
+            if not author_uid:
+                _answer_callback(token, callback_id, "⚠️ 数据库中没有此发帖人的 UID，无法屏蔽。")
+                return
+                
+            blocked_uids = config.get("blocked_uids", [])
+            if author_uid not in blocked_uids:
+                blocked_uids.append(author_uid)
+                database.update_config({"blocked_uids": blocked_uids})
+                alert_msg = f"🚫 已成功屏蔽该作者 (UID: {author_uid})！"
+            else:
+                alert_msg = f"ℹ️ 该作者 (UID: {author_uid}) 之前已被屏蔽。"
+                
+            _answer_callback(token, callback_id, alert_msg)
+            _update_message_block_button(token, chat_id, message_id, callback_query.get("message", {}).get("reply_markup"), data_str)
             return
             
     except Exception as e:
@@ -167,6 +192,36 @@ def _update_message_star_button(token, chat_id, message_id, reply_markup, clicke
                     num_match = re.search(r'#(\d+)', text)
                     num = num_match.group(1) if num_match else ""
                     btn["text"] = f"★ #{num} 已收藏"
+                updated = True
+                break
+        if updated:
+            break
+            
+    if updated:
+        url = f"https://api.telegram.org/bot{token}/editMessageReplyMarkup"
+        payload = {
+            "chat_id": chat_id,
+            "message_id": message_id,
+            "reply_markup": {"inline_keyboard": inline_keyboard}
+        }
+        try:
+            requests.post(url, json=payload, impersonate="chrome120", timeout=10)
+        except Exception as e:
+            logger.error(f"❌ 更新原消息键盘失败: {e}")
+
+def _update_message_block_button(token, chat_id, message_id, reply_markup, clicked_data):
+    """点击屏蔽后，将被点击按钮设为已屏蔽状态，禁用该按钮"""
+    if not reply_markup or "inline_keyboard" not in reply_markup:
+        return
+        
+    inline_keyboard = reply_markup["inline_keyboard"]
+    updated = False
+    
+    for row in inline_keyboard:
+        for btn in row:
+            if btn.get("callback_data") == clicked_data:
+                btn["text"] = "已屏蔽 🚫"
+                btn["callback_data"] = "disabled:action"
                 updated = True
                 break
         if updated:
