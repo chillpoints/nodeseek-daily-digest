@@ -13,6 +13,7 @@ def run_job():
     try:
         import nodeseek_digest
         nodeseek_digest.run_digest_job()
+        nodeseek_digest.push_pending_digests()
     except Exception as e:
         logger.error(f"❌ 自动调度任务执行失败: {e}")
 

@@ -95,10 +95,12 @@ def fetch_html(url, config):
         else:
             raise Exception(f"HTTP 请求失败，状态码: {res.status_code}")
 
-def run_digest_job():
-    """开始一次完整的抓取及推送任务"""
+def run_digest_job(config=None):
+    """开始一次完整的抓取及保存任务（不含推送）"""
     logger.info("🚀 启动热帖拉取任务流程...")
-    config = database.get_config()
+    if config is None:
+        config = database.get_config()
+        
     nodeseek_url = config["nodeseek_url"]
     max_pages = config["max_pages"]
     lucky_keywords = config["lucky_keywords"]
@@ -163,22 +165,12 @@ def run_digest_job():
     unique_posts = {p['id']: p for p in posts}.values()
     sorted_posts = sorted(unique_posts, key=lambda x: x['score'], reverse=True)[:10]
     
-    # 持久化保存到本地 SQLite 数据库中
+    # 持久化保存到本地 SQLite 数据库中（默认未推送 push_status=0）
     if sorted_posts:
         database.save_posts(sorted_posts)
         logger.info(f"💾 成功保存 {len(sorted_posts)} 个热帖到本地数据库。")
-        
-        # 执行 Telegram 推送
-        tg_token = config.get("tg_bot_token")
-        chat_id = config.get("tg_chat_id")
-        
-        if tg_token and chat_id:
-            logger.info("📡 准备发送推送消息至 Telegram 机器人...")
-            send_to_telegram(sorted_posts, tg_token, chat_id)
-        else:
-            logger.info("ℹ️ 未配置 Telegram Bot 参数，跳过自动推送。")
     else:
-        logger.warn("⚠️ 未筛选出符合热度要求的有效帖子。")
+        logger.warning("⚠️ 未筛选出符合热度要求的有效帖子。")
 
 def send_to_telegram(posts, token, chat_id):
     """推送 HTML 目录至 Telegram 机器人"""
@@ -202,14 +194,43 @@ def send_to_telegram(posts, token, chat_id):
         res = requests.post(telegram_url, json=payload, impersonate="chrome120", timeout=10)
         if res.status_code == 200:
             logger.info("🎉 Telegram 消息推送成功！")
+            return True
         else:
             logger.error(f"❌ 推送失败，TG 响应: {res.text}")
+            return False
     except Exception as e:
         logger.error(f"❌ 推送请求异常: {e}")
+        return False
 
-def crawl_post_details(post_id):
+def push_pending_digests(config=None):
+    """读取未推送的帖子，发送至 Telegram 并更新推送状态"""
+    if config is None:
+        config = database.get_config()
+        
+    tg_token = config.get("tg_bot_token")
+    chat_id = config.get("tg_chat_id")
+    
+    if not tg_token or not chat_id:
+        logger.info("ℹ️ 未配置 Telegram Bot 参数，跳过自动推送。")
+        return
+        
+    # 获取未推送的高热度帖子
+    pending_posts = database.get_pending_push_posts(limit=10)
+    if not pending_posts:
+        logger.info("ℹ️ 没有未推送的候选热帖。")
+        return
+        
+    logger.info(f"📡 发现 {len(pending_posts)} 个待推送的候选热帖，准备推送...")
+    success = send_to_telegram(pending_posts, tg_token, chat_id)
+    if success:
+        post_ids = [p["id"] for p in pending_posts]
+        database.update_posts_push_status(post_ids, 1)
+        logger.info(f"💾 已将 {len(post_ids)} 个帖子在数据库中的推送状态更新为已推送。")
+
+def crawl_post_details(post_id, config=None):
     """动态拉取某一帖子具体详情页（正文及评论集，保持原本 HTML 并通过 JSON 返回）"""
-    config = database.get_config()
+    if config is None:
+        config = database.get_config()
     nodeseek_url = config["nodeseek_url"]
     url = f"{nodeseek_url}/post-{post_id}-1"
     

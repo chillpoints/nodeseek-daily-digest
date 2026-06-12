@@ -90,7 +90,8 @@ def fetch_logs():
 def trigger_run(background_tasks: BackgroundTasks):
     logging.info("⚡ 控制面板触发手动执行抓取任务...")
     background_tasks.add_task(nodeseek_digest.run_digest_job)
-    return {"status": "success", "message": "抓取任务已成功在后台启动。"}
+    background_tasks.add_task(nodeseek_digest.push_pending_digests)
+    return {"status": "success", "message": "抓取与推送任务已成功在后台顺序启动。"}
 
 @app.get("/api/post/{post_id}")
 def fetch_post_details(post_id: str):

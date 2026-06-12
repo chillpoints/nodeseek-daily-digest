@@ -1,6 +1,10 @@
 import sqlite3
 import os
+import threading
 from datetime import datetime
+
+# 全局 SQLite 连接互斥锁，确保并发读写安全
+db_lock = threading.Lock()
 
 DB_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "nodeseek_digest.db")
 
@@ -10,8 +14,9 @@ def get_db():
     return conn
 
 def init_db():
-    conn = get_db()
-    cursor = conn.cursor()
+    with db_lock:
+        conn = get_db()
+        cursor = conn.cursor()
     # 建立配置表
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS config (
@@ -56,8 +61,9 @@ def init_db():
     conn.close()
 
 def get_config():
-    conn = get_db()
-    cursor = conn.cursor()
+    with db_lock:
+        conn = get_db()
+        cursor = conn.cursor()
     cursor.execute("SELECT key, value FROM config")
     rows = cursor.fetchall()
     conn.close()
@@ -74,8 +80,9 @@ def get_config():
     return config
 
 def update_config(new_config):
-    conn = get_db()
-    cursor = conn.cursor()
+    with db_lock:
+        conn = get_db()
+        cursor = conn.cursor()
     for k, v in new_config.items():
         if k == "lucky_keywords" and isinstance(v, list):
             v = ",".join(v)
@@ -84,24 +91,63 @@ def update_config(new_config):
     conn.close()
 
 def save_posts(posts):
-    conn = get_db()
-    cursor = conn.cursor()
-    date_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    for post in posts:
-        cursor.execute("""
-        INSERT OR REPLACE INTO posts (id, title, url, views, comments, score, crawler_date, push_status)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (post["id"], post["title"], post["url"], post["views"], post["comments"], post["score"], date_str, 1))
-    conn.commit()
-    conn.close()
+    with db_lock:
+        conn = get_db()
+        cursor = conn.cursor()
+        date_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        for post in posts:
+            cursor.execute("""
+            INSERT INTO posts (id, title, url, views, comments, score, crawler_date, push_status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 0)
+            ON CONFLICT(id) DO UPDATE SET
+                views=excluded.views,
+                comments=excluded.comments,
+                score=excluded.score,
+                crawler_date=excluded.crawler_date
+            """, (post["id"], post["title"], post["url"], post["views"], post["comments"], post["score"], date_str))
+        conn.commit()
+        conn.close()
 
 def get_posts_history(limit=50):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, title, url, views, comments, score, crawler_date FROM posts ORDER BY crawler_date DESC LIMIT ?", (limit,))
-    rows = cursor.fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
+    with db_lock:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, title, url, views, comments, score, crawler_date FROM posts ORDER BY crawler_date DESC LIMIT ?", (limit,))
+        rows = cursor.fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+
+def get_pending_push_posts(limit=10):
+    """获取尚未推送的高热度帖子"""
+    with db_lock:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("""
+        SELECT id, title, url, views, comments, score, crawler_date
+        FROM posts
+        WHERE push_status = 0
+        ORDER BY score DESC
+        LIMIT ?
+        """, (limit,))
+        rows = cursor.fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+
+def update_posts_push_status(post_ids, status):
+    """更新指定帖子的推送状态"""
+    if not post_ids:
+        return
+    with db_lock:
+        conn = get_db()
+        cursor = conn.cursor()
+        placeholders = ",".join(["?"] * len(post_ids))
+        cursor.execute(f"""
+        UPDATE posts
+        SET push_status = ?
+        WHERE id IN ({placeholders})
+        """, [status] + list(post_ids))
+        conn.commit()
+        conn.close()
 
 # 初始化数据库
 init_db()
