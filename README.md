@@ -1,78 +1,56 @@
-# NodeSeek 每日热贴推送助手 (NodeSeek Daily Digest)
+# NodeSeek 每日热贴推送与控制面板 (NodeSeek Daily Digest)
 
-本工具是一个部署在 Linux 服务器（如 Debian 12）上的轻量级 Python 自动化工具。它能够每日定时抓取 NodeSeek 论坛的高人气热帖，计算热度，自动过滤掉抽奖无意义帖，并每天自动将 Top 10 热帖的精美简报推送到您的 Telegram 频道或对话中。
+本工具是一个部署在 Linux 服务器（如 Debian 12）上的轻量级 NodeSeek 论坛热帖精选分析与推送程序。升级后，它集成了 **Web 控制大盘、精选 Feed 阅读器、APScheduler 定时任务调度中心、SQLite3 数据库** 以及 **一键交互式安装脚本**，既可以通过 Telegram 机器人每日接收订阅推送，也可以在本地网页上直接像刷官网一样舒适阅读高人气热帖。
 
 ---
 
 ## ✨ 项目功能特性
 
-*   🛡️ **强力防 CF 拦截**：基于 `curl_cffi` 库，深度模拟 Chrome 等真实浏览器的 TLS / JA3 握手指纹和 HTTP/2 特征，完美避开 Cloudflare 5秒盾与 WAF 拦截。
-*   🚫 **无用信息过滤**：根据关键词（如“抽奖”、“送码”、“送鸡腿”等）自动排除各种无价值的刷水抽奖贴。
-*   📈 **科学热度排序**：根据评论数与浏览量进行综合加权计算（热度公式：`评论数 * 5 + 浏览量 * 0.2`），仅推荐 24 小时内最活跃的优质帖子。
-*   🔗 **精美格式推送**：将每日精选帖子以 HTML 格式生成目录与指标（阅读数、评论数、热度值），并直接推送到 Telegram。
-*   ⚙️ **配置灵活**：支持读取本地 `config.json`，同时也支持通过环境变量（`TG_BOT_TOKEN`, `TG_CHAT_ID`）在 Docker/云环境进行无感知部署。
+*   🛡️ **JA3 浏览器指纹过 CF 盾**：基于 `curl_cffi` 库，深度模拟 Chrome 浏览器的 TLS/JA3 指纹和 HTTP/2 握手特征，完美绕过 Cloudflare 5秒盾与人机安全阻拦。
+*   🌐 **本地精选 Feed 阅读器**：像 RSS 阅读器一样，卡片式展示今日高热度帖子。点击卡片可直接在本地网页上以精美排版（支持原生 HTML，保留格式、图片和代码块）直接阅读主帖及所有精彩跟帖评论。
+*   🔑 **NodeSeek 登录态 Cookie 注入**：支持在网页后台直接输入并更新您的 NodeSeek 账号 `cookie`，由爬虫在后台自动携带 Cookie 访问，完美解锁各种“高等级限制/仅登录可见”的福利及技术帖。
+*   🚫 **无意义灌水帖过滤**：自定义过滤词（如“抽奖”、“送码”、“送鸡腿”等）自动排除所有无价值的抽奖水帖。
+*   🕰️ **可视化计划调度**：可在配置面板直接调整为“每天固定时间执行”或“每隔几小时执行一次”，并且可以设定爬取页数和翻页防风控时间。
+*   📦 **一键交互式部署脚本**：提供极简的 `deploy.sh` 脚本，支持一键安装依赖环境、随机/自选运行端口、注册 systemd 守护进程、开机自启、卸载、重装及重启管理。
 
 ---
 
-## 🛠️ 部署使用步骤
+## 🚀 一键式交互安装步骤
 
-### 1. 克隆项目与安装依赖
-在您的 Debian / Ubuntu 服务器上克隆本仓库，进入目录并安装依赖包：
+登录您的 Debian 12 服务器，按顺序运行以下命令即可：
 
 ```bash
+# 1. 克隆项目仓库到服务器本地
 git clone https://github.com/chillpoints/nodeseek-daily-digest.git
 cd nodeseek-daily-digest
 
-# 安装依赖
-sudo apt update
-sudo apt install -y python3 python3-pip
-pip3 install -r requirements.txt
+# 2. 以 root 权限运行一键部署脚本
+sudo bash deploy.sh
 ```
 
-### 2. 参数配置
-将目录下的 `config.json.example` 复制为 `config.json`：
-
-```bash
-cp config.json.example config.json
-```
-
-编辑 `config.json` 填入您的 Telegram 机器人凭证：
-
-```json
-{
-  "tg_bot_token": "您的_TELEGRAM_BOT_TOKEN",
-  "tg_chat_id": "您的_TELEGRAM_CHAT_ID",
-  "nodeseek_url": "https://www.nodeseek.com",
-  "max_pages": 5,
-  "lucky_keywords": ["抽奖", "送码", "送鸡腿", "卡密", "免费送", "送个", "福利", "送台"]
-}
-```
-
-> [!TIP]
-> * **Telegram Token** 可通过 [@BotFather](https://t.me/BotFather) 发送 `/newbot` 获取。
-> * **Chat ID** 可通过 [@userinfobot](https://t.me/userinfobot) 获取。创建完机器人后，请确保在 Telegram 中主动与机器人发起过一次聊天（点击 Start），否则机器人将无权向您推送消息。
-
-### 3. 测试运行
-```bash
-python3 nodeseek_digest.py
-```
-若配置正确，您的 Telegram 将立即收到一封今日热帖排版总结。
+### 交互脚本功能：
+运行后将弹出交互式菜单，输入 `1` 即可开始自动配置安装：
+*   脚本会自动检测并补全 Python3 及 pip 虚拟环境环境。
+*   提示您输入运行端口。如果直接按回车，系统将**随机选择 20000 到 30000 之间的空闲端口**。
+*   自动创建虚拟环境隔离全局 Python 依赖，安装 `requirements.txt`。
+*   将网页后台注册为 `systemd` 系统服务进程，自动开机自启。
+*   输出控制面板的 Web 登录链接（例如：`http://YOUR_SERVER_IP:PORT`）。
 
 ---
 
-## 📅 设置每日定时自动执行
+## ⚙️ 网页控制面板使用说明
 
-我们使用 Linux 的 `crontab` 实现每日自动推送。
+打开输出的网页地址：
 
-1. 打开 Cron 任务编辑器：
-   ```bash
-   crontab -e
-   ```
-2. 在文件末尾添加以下配置（设置每天晚上 **21:30** 自动抓取并推送，注意将路径替换为您的真实物理路径）：
-   ```text
-   30 21 * * * /usr/bin/python3 /path/to/nodeseek-daily-digest/nodeseek_digest.py > /dev/null 2>&1
-   ```
-3. 保存并退出即可。
+1.  **Dashboard（控制台）**：
+    *   展示当前自动调度的模式、所用爬虫引擎、TG推送状态。
+    *   下方配有“实时日志控制台”，可直接点击 **“立即运行抓取”** 触发，并在控制台视窗中实时看到爬虫的 fetch 动作和推送反馈。
+2.  **Settings（参数配置）**：
+    *   **Cookie 填入**：在浏览器中登录 NodeSeek 后，按 `F12` -> 进 `Application` -> `Cookies` -> 选择 `www.nodeseek.com`，复制包含 `nsk_` 系列的所有 Cookie 值并填入。
+    *   **Telegram 推送**：填入 Telegram Bot Token 以及您的个人 Chat ID 开启自动订阅。
+3.  **Feed Reader（精选阅读）**：
+    *   抓取到的数据将保存在本地的 SQLite 数据库中。
+    *   左侧列表展示热点帖子，右侧展示其排版正文和精彩评论，完全免去您打开原站的时间，在服务器后台完成最干净的阅读。
 
 ---
 

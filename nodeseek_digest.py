@@ -2,48 +2,23 @@
 # -*- coding: utf-8 -*-
 
 import os
-import json
 import re
+import time
+import json
+import logging
 from datetime import datetime
 from curl_cffi import requests
 from bs4 import BeautifulSoup
+import database
 
-# 请求头，模拟真实的普通浏览器请求
+# 网页抓取通用 User-Agent
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
     "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8"
 }
 
-def load_config():
-    """读取本地 config.json 或通过环境变量注入配置"""
-    config = {
-        "tg_bot_token": "",
-        "tg_chat_id": "",
-        "nodeseek_url": "https://www.nodeseek.com",
-        "max_pages": 5,
-        "lucky_keywords": ["抽奖", "送码", "送鸡腿", "卡密", "免费送", "送个", "福利", "送台"]
-    }
-    
-    # 尝试加载本地 config.json
-    config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
-    if os.path.exists(config_path):
-        try:
-            with open(config_path, "r", encoding="utf-8") as f:
-                local_config = json.load(f)
-                config.update(local_config)
-        except Exception as e:
-            print(f"警告: 读取 config.json 失败: {e}")
-            
-    # 环境变量覆盖（用于 Docker/Actions 等平台部署）
-    if os.environ.get("TG_BOT_TOKEN"):
-        config["tg_bot_token"] = os.environ.get("TG_BOT_TOKEN")
-    if os.environ.get("TG_CHAT_ID"):
-        config["tg_chat_id"] = os.environ.get("TG_CHAT_ID")
-    if os.environ.get("NODESEEK_URL"):
-        config["nodeseek_url"] = os.environ.get("NODESEEK_URL")
-        
-    return config
+logger = logging.getLogger("nodeseek_digest")
 
 def parse_count(text):
     """提取浏览量与评论数中的数字"""
@@ -65,27 +40,83 @@ def is_recent(time_text):
         return False
     return True
 
-def fetch_hot_posts(config):
-    posts = []
-    max_pages = config["max_pages"]
+def fetch_html_playwright(url, cookie):
+    """使用 Playwright 无头浏览器方式抓取网页 (解析并携带 Cookie)"""
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError as e:
+        raise Exception("未安装 Playwright 依赖。请登录后台或在终端中运行: pip3 install playwright && playwright install chromium") from e
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        context = browser.new_context(
+            user_agent=HEADERS["User-Agent"],
+            viewport={"width": 1280, "height": 800}
+        )
+        
+        # 注入 NodeSeek Cookie 以获取高等级帖子
+        if cookie:
+            cookies_to_add = []
+            for item in cookie.split(";"):
+                if "=" in item:
+                    k, v = item.strip().split("=", 1)
+                    cookies_to_add.append({
+                        "name": k,
+                        "value": v,
+                        "domain": ".nodeseek.com",
+                        "path": "/"
+                    })
+            if cookies_to_add:
+                context.add_cookies(cookies_to_add)
+                
+        page = context.new_page()
+        # 访问页面，等待网络空闲
+        page.goto(url, wait_until="networkidle", timeout=20000)
+        html_content = page.content()
+        browser.close()
+        return html_content
+
+def fetch_html(url, config):
+    """网络请求代理：根据配置使用 curl_cffi 或 Playwright"""
+    engine = config.get("crawler_engine", "curl_cffi")
+    cookie = config.get("cookie", "")
+    
+    headers = HEADERS.copy()
+    if cookie:
+        headers["Cookie"] = cookie
+        
+    if engine == "playwright":
+        return fetch_html_playwright(url, cookie)
+    else:
+        # curl_cffi 模拟 Chrome JA3/H2 特征防封
+        res = requests.get(url, headers=headers, impersonate="chrome120", timeout=15)
+        if res.status_code == 200:
+            return res.text
+        else:
+            raise Exception(f"HTTP 请求失败，状态码: {res.status_code}")
+
+def run_digest_job():
+    """开始一次完整的抓取及推送任务"""
+    logger.info("🚀 启动热帖拉取任务流程...")
+    config = database.get_config()
     nodeseek_url = config["nodeseek_url"]
+    max_pages = config["max_pages"]
     lucky_keywords = config["lucky_keywords"]
+    page_delay = config.get("page_delay", 2)
+    
+    posts = []
     
     for page in range(1, max_pages + 1):
         url = f"{nodeseek_url}/page-{page}" if page > 1 else nodeseek_url
-        print(f"正在抓取页面: {url}")
+        logger.info(f"正在扫描第 {page} 页: {url}")
         
         try:
-            # 关键点：使用 curl_cffi.requests 并指定 impersonate='chrome120'，提供完整的 TLS/JA3 指纹模拟，绕过 Cloudflare 阻拦
-            res = requests.get(url, headers=HEADERS, impersonate="chrome120", timeout=15)
-            if res.status_code != 200:
-                print(f"抓取页面失败: HTTP {res.status_code}")
-                continue
+            html_text = fetch_html(url, config)
         except Exception as e:
-            print(f"请求发生异常: {e}")
+            logger.error(f"第 {page} 页抓取失败: {e}")
             continue
             
-        soup = BeautifulSoup(res.text, 'html.parser')
+        soup = BeautifulSoup(html_text, 'html.parser')
         items = soup.select('li.post-list-item')
         
         for item in items:
@@ -94,25 +125,26 @@ def fetch_hot_posts(config):
                 continue
             title = link_el.text.strip()
             href = link_el.get('href')
-            post_id = re.search(r'post-(\d+)', href).group(1) if re.search(r'post-(\d+)', href) else ""
+            post_id_match = re.search(r'post-(\d+)', href)
+            post_id = post_id_match.group(1) if post_id_match else ""
             
-            # 1. 过滤抽奖贴
+            # 1. 过滤抽奖灌水帖
             if any(kw in title.lower() for kw in lucky_keywords):
                 continue
                 
-            # 2. 提取阅读数与评论数
+            # 2. 提取阅读与评论数
             views_el = item.select_one('.info-views')
             comments_el = item.select_one('.info-comments-count')
             views = parse_count(views_el.text) if views_el else 0
             comments = parse_count(comments_el.text) if comments_el else 0
             
-            # 3. 时间合法性过滤
+            # 3. 过滤非24小时活跃贴
             time_el = item.select_one('.info-last-comment-time time')
             time_text = time_el.text if time_el else "1s ago"
             if not is_recent(time_text):
                 continue
                 
-            # 4. 计算热度分数：评论*5 + 浏览*0.2
+            # 4. 热度计算
             hot_score = round(comments * 5.0 + views * 0.2, 1)
             
             posts.append({
@@ -124,32 +156,41 @@ def fetch_hot_posts(config):
                 "score": hot_score
             })
             
-    # 去重并以热度降序排序，取前10条
+        if page < max_pages:
+            time.sleep(page_delay)
+            
+    # 去重并排序
     unique_posts = {p['id']: p for p in posts}.values()
     sorted_posts = sorted(unique_posts, key=lambda x: x['score'], reverse=True)[:10]
-    return sorted_posts
-
-def send_to_telegram(posts, config):
-    if not posts:
-        print("未筛选出今日热帖。")
-        return
-        
-    tg_token = config["tg_bot_token"]
-    chat_id = config["tg_chat_id"]
     
-    if not tg_token or not chat_id:
-        print("错误: 缺少 tg_bot_token 或 tg_chat_id 配置，无法完成推送！")
-        return
+    # 持久化保存到本地 SQLite 数据库中
+    if sorted_posts:
+        database.save_posts(sorted_posts)
+        logger.info(f"💾 成功保存 {len(sorted_posts)} 个热帖到本地数据库。")
         
+        # 执行 Telegram 推送
+        tg_token = config.get("tg_bot_token")
+        chat_id = config.get("tg_chat_id")
+        
+        if tg_token and chat_id:
+            logger.info("📡 准备发送推送消息至 Telegram 机器人...")
+            send_to_telegram(sorted_posts, tg_token, chat_id)
+        else:
+            logger.info("ℹ️ 未配置 Telegram Bot 参数，跳过自动推送。")
+    else:
+        logger.warn("⚠️ 未筛选出符合热度要求的有效帖子。")
+
+def send_to_telegram(posts, token, chat_id):
+    """推送 HTML 目录至 Telegram 机器人"""
     date_str = datetime.now().strftime("%Y-%m-%d %H:%M")
-    html_msg = f"<b>🔥 NodeSeek 今日高热度贴总结</b>\n"
+    html_msg = f"<b>🔥 NodeSeek 今日热帖订阅</b>\n"
     html_msg += f"<i>📅 生成时间: {date_str} (已自动过滤抽奖帖)</i>\n\n"
     
     for index, post in enumerate(posts):
         html_msg += f"{index + 1}. <b><a href='{post['url']}'>{post['title']}</a></b>\n"
         html_msg += f"    👀 {post['views']} 阅读 | 💬 {post['comments']} 评论 | 📈 热度值: <b>{post['score']}</b>\n\n"
         
-    telegram_url = f"https://api.telegram.org/bot{tg_token}/sendMessage"
+    telegram_url = f"https://api.telegram.org/bot{token}/sendMessage"
     payload = {
         "chat_id": chat_id,
         "text": html_msg,
@@ -158,16 +199,77 @@ def send_to_telegram(posts, config):
     }
     
     try:
-        res = requests.post(telegram_url, json=payload, timeout=10)
+        res = requests.post(telegram_url, json=payload, impersonate="chrome120", timeout=10)
         if res.status_code == 200:
-            print("Telegram 消息推送成功！")
+            logger.info("🎉 Telegram 消息推送成功！")
         else:
-            print(f"推送失败，Telegram 响应: {res.text}")
+            logger.error(f"❌ 推送失败，TG 响应: {res.text}")
     except Exception as e:
-        print(f"推送请求发生异常: {e}")
+        logger.error(f"❌ 推送请求异常: {e}")
 
-if __name__ == "__main__":
-    config = load_config()
-    print("已成功载入配置。")
-    hot_posts = fetch_hot_posts(config)
-    send_to_telegram(hot_posts, config)
+def crawl_post_details(post_id):
+    """动态拉取某一帖子具体详情页（正文及评论集，保持原本 HTML 并通过 JSON 返回）"""
+    config = database.get_config()
+    nodeseek_url = config["nodeseek_url"]
+    url = f"{nodeseek_url}/post-{post_id}-1"
+    
+    try:
+        html_text = fetch_html(url, config)
+    except Exception as e:
+        logger.error(f"获取帖子 {post_id} 页面失败: {e}")
+        return {"error": f"抓取详情页面失败: {str(e)}"}
+        
+    soup = BeautifulSoup(html_text, 'html.parser')
+    
+    # 1. 主帖作者及头像
+    poster_name = "未知"
+    poster_avatar = ""
+    poster_el = soup.select_one('.nsk-post .author-name')
+    if poster_el:
+        poster_name = poster_el.text.strip()
+    avatar_el = soup.select_one('.nsk-post img.avatar-normal')
+    if avatar_el:
+        poster_avatar = avatar_el.get('src')
+        
+    # 2. 帖子正文 HTML
+    content_el = soup.select_one('.nsk-post article.post-content, .nsk-post .post-content, .nsk-post .md-content')
+    content_html = str(content_el) if content_el else "<p>未获取到帖子正文内容。</p>"
+    
+    # 3. 评论列表解析
+    comments = []
+    comment_items = soup.select('ul.comments li.content-item')
+    
+    for item in comment_items:
+        floor_el = item.select_one('.floor-link')
+        author_el = item.select_one('.author-name')
+        c_avatar_el = item.select_one('img.avatar-normal')
+        c_content_el = item.select_one('article.post-content, .post-content, .md-content')
+        
+        floor = floor_el.text.strip() if floor_el else ""
+        author = author_el.text.strip() if author_el else "匿名"
+        avatar = c_avatar_el.get('src') if c_avatar_el else ""
+        
+        # 将评论中的相对图片/跳转路径升级为绝对路径
+        c_content_html = ""
+        if c_content_el:
+            # 升级相对图片
+            for img in c_content_el.select('img[src^="/"]'):
+                img['src'] = nodeseek_url + img['src']
+            for a in c_content_el.select('a[href^="/"]'):
+                a['href'] = nodeseek_url + a['href']
+            c_content_html = str(c_content_el)
+            
+        comments.append({
+            "floor": floor,
+            "author": author,
+            "avatar": avatar,
+            "content_html": c_content_html
+        })
+        
+    return {
+        "id": post_id,
+        "poster_name": poster_name,
+        "poster_avatar": poster_avatar,
+        "content_html": content_html,
+        "comments": comments
+    }

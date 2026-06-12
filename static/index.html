@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NodeSeek Daily Digest - 控制面板</title>
+    <!-- Google Fonts & FontAwesome -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Space+Grotesk:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: rgba(17, 25, 40, 0.75);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --primary-gradient: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
+            --accent-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --success: #10b981;
+            --danger: #ef4444;
+            --cyan-glow: rgba(0, 242, 254, 0.15);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            overflow-x: hidden;
+            min-height: 100vh;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(0, 242, 254, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 85% 80%, rgba(245, 87, 108, 0.08) 0%, transparent 40%);
+            background-attachment: fixed;
+        }
+
+        /* Container Layout */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Glassmorphism Header */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 30px;
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            backdrop-filter: blur(16px);
+            margin-bottom: 30px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+        }
+
+        .logo {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 24px;
+            font-weight: 700;
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* Navigation Tabs */
+        .nav-tabs {
+            display: flex;
+            gap: 10px;
+            background: rgba(255, 255, 255, 0.03);
+            padding: 5px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .tab-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .tab-btn:hover {
+            color: var(--text-main);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .tab-btn.active {
+            color: var(--bg-color);
+            background: var(--primary-gradient);
+            box-shadow: 0 4px 15px var(--cyan-glow);
+        }
+
+        /* Main Sections */
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.4s ease-out forwards;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Cards Grid */
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            padding: 25px;
+            backdrop-filter: blur(16px);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
+            margin-bottom: 25px;
+        }
+
+        .card-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding-bottom: 12px;
+        }
+
+        /* Dashboard View */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            transition: transform 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-3px);
+            border-color: rgba(0, 242, 254, 0.3);
+        }
+
+        .stat-icon {
+            font-size: 28px;
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            padding: 12px;
+            background-color: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+        }
+
+        .stat-info h3 {
+            font-size: 14px;
+            color: var(--text-muted);
+            font-weight: 400;
+        }
+
+        .stat-info p {
+            font-size: 22px;
+            font-weight: 700;
+            margin-top: 4px;
+        }
+
+        /* Console Log Window */
+        .console-window {
+            background: #050811;
+            border: 1px solid #1f2937;
+            border-radius: 12px;
+            padding: 15px;
+            font-family: 'Space Grotesk', monospace;
+            font-size: 13px;
+            color: #00f2fe;
+            height: 350px;
+            overflow-y: auto;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.8);
+            line-height: 1.6;
+        }
+
+        .console-line {
+            margin-bottom: 6px;
+            word-break: break-all;
+        }
+
+        .console-line.error { color: var(--danger); }
+        .console-line.success { color: var(--success); }
+        .console-line.warn { color: var(--accent-gradient); }
+
+        /* Buttons styles */
+        .btn {
+            background: var(--primary-gradient);
+            color: var(--bg-color);
+            border: none;
+            padding: 12px 28px;
+            border-radius: 10px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 15px;
+        }
+
+        .btn:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px var(--cyan-glow);
+        }
+
+        .btn.btn-secondary {
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text-main);
+            border: 1px solid var(--card-border);
+        }
+
+        .btn.btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.15);
+            box-shadow: none;
+        }
+
+        /* Settings Forms */
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 25px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .form-group label {
+            font-size: 14px;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        .form-control {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            padding: 12px;
+            color: var(--text-main);
+            font-family: inherit;
+            font-size: 15px;
+            transition: all 0.3s ease;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #00f2fe;
+            box-shadow: 0 0 10px var(--cyan-glow);
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        textarea.form-control {
+            resize: vertical;
+            min-height: 90px;
+        }
+
+        select.form-control {
+            cursor: pointer;
+        }
+
+        /* Feed Reader (2 Columns layout) */
+        .feed-container {
+            display: grid;
+            grid-template-columns: 380px 1fr;
+            gap: 25px;
+            height: calc(100vh - 180px);
+            min-height: 600px;
+        }
+
+        .feed-list {
+            overflow-y: auto;
+            border-right: 1px solid rgba(255, 255, 255, 0.05);
+            padding-right: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .feed-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            padding: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .feed-card:hover, .feed-card.active {
+            background: rgba(0, 242, 254, 0.05);
+            border-color: rgba(0, 242, 254, 0.4);
+            transform: translateX(4px);
+        }
+
+        .feed-card-title {
+            font-size: 15px;
+            font-weight: 600;
+            line-height: 1.4;
+            margin-bottom: 8px;
+        }
+
+        .feed-card-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .feed-card-metrics {
+            display: flex;
+            gap: 8px;
+        }
+
+        .feed-viewer {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            padding: 30px;
+            overflow-y: auto;
+            backdrop-filter: blur(16px);
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .viewer-empty {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: var(--text-muted);
+            gap: 15px;
+            font-size: 16px;
+        }
+
+        .viewer-empty i {
+            font-size: 48px;
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* Post Render Details */
+        .post-header {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            padding-bottom: 20px;
+        }
+
+        .post-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            border: 2px solid rgba(0, 242, 254, 0.3);
+            object-fit: cover;
+        }
+
+        .post-title-text {
+            font-size: 22px;
+            font-weight: 700;
+            line-height: 1.3;
+        }
+
+        .post-meta-info {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-top: 6px;
+        }
+
+        /* Post Body (NodeSeek Native Styles Mapping) */
+        .post-body {
+            font-size: 15px;
+            line-height: 1.7;
+            word-wrap: break-word;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            padding-bottom: 35px;
+        }
+
+        .post-body p {
+            margin-bottom: 12px;
+        }
+
+        .post-body img {
+            max-width: 100%;
+            border-radius: 8px;
+            margin: 10px 0;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .post-body a {
+            color: #00f2fe;
+            text-decoration: none;
+        }
+
+        .post-body a:hover {
+            text-decoration: underline;
+        }
+
+        .post-body code {
+            font-family: 'Space Grotesk', monospace;
+            background: rgba(255,255,255,0.06);
+            padding: 3px 6px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .post-body pre {
+            background: #050811;
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 15px 0;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .post-body pre code {
+            background: transparent;
+            padding: 0;
+        }
+
+        .post-body blockquote {
+            border-left: 4px solid #00f2fe;
+            padding-left: 15px;
+            color: var(--text-muted);
+            margin: 15px 0;
+            font-style: italic;
+        }
+
+        /* Comments List */
+        .comments-section {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .comment-item {
+            background: rgba(255, 255, 255, 0.015);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 15px;
+            display: flex;
+            gap: 15px;
+        }
+
+        .comment-avatar {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            object-fit: cover;
+            flex-shrink: 0;
+        }
+
+        .comment-content-wrapper {
+            flex-grow: 1;
+        }
+
+        .comment-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .comment-author {
+            font-weight: 600;
+            font-size: 13px;
+            color: var(--text-main);
+        }
+
+        .comment-floor {
+            font-size: 11px;
+            color: var(--text-muted);
+            background: rgba(255,255,255,0.05);
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        .comment-body {
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        
+        .comment-body img {
+            max-width: 80px;
+            max-height: 80px;
+            border-radius: 4px;
+        }
+
+        /* Hide Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.1);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255,255,255,0.2);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- Header -->
+    <header>
+        <div class="logo">
+            <i class="fa-solid fa-fire-flame-curved"></i>
+            <span>NodeSeek Daily Digest</span>
+        </div>
+        <div class="nav-tabs">
+            <button class="tab-btn active" onclick="switchTab('dashboard')">
+                <i class="fa-solid fa-chart-line"></i>控制台
+            </button>
+            <button class="tab-btn" onclick="switchTab('reader')">
+                <i class="fa-solid fa-book-open"></i>精选阅读
+            </button>
+            <button class="tab-btn" onclick="switchTab('settings')">
+                <i class="fa-solid fa-gears"></i>参数配置
+            </button>
+        </div>
+    </header>
+
+    <!-- Dashboard Content -->
+    <div id="dashboard" class="tab-content active">
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon"><i class="fa-solid fa-clock"></i></div>
+                <div class="stat-info">
+                    <h3>自动调度模式</h3>
+                    <p id="stat-schedule">加载中...</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon"><i class="fa-solid fa-spider"></i></div>
+                <div class="stat-info">
+                    <h3>爬虫采集引擎</h3>
+                    <p id="stat-engine">加载中...</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon"><i class="fa-solid fa-paper-plane"></i></div>
+                <div class="stat-info">
+                    <h3>TG 自动推送</h3>
+                    <p id="stat-push">加载中...</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">
+                <i class="fa-solid fa-terminal"></i>
+                <span>运行状态与实时日志</span>
+                <button class="btn" onclick="triggerScrape()" style="margin-left: auto; padding: 8px 16px; font-size: 13px;">
+                    <i class="fa-solid fa-bolt"></i>立即运行抓取
+                </button>
+            </div>
+            <div class="console-window" id="log-console">
+                <div class="console-line">等待加载系统日志...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Feed Reader Content -->
+    <div id="reader" class="tab-content">
+        <div class="feed-container">
+            <!-- Left Side Feed List -->
+            <div class="feed-list" id="post-list-container">
+                <!-- Template injection -->
+            </div>
+            <!-- Right Side Reader Viewer -->
+            <div class="feed-viewer" id="post-viewer-container">
+                <div class="viewer-empty">
+                    <i class="fa-solid fa-book-open-reader"></i>
+                    <p>在左侧选择一个精选的帖子进行阅读</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Content -->
+    <div id="settings" class="tab-content">
+        <div class="card">
+            <div class="card-title">
+                <i class="fa-solid fa-sliders"></i>
+                <span>全局参数配置</span>
+            </div>
+            <form id="settings-form" onsubmit="saveConfig(event)">
+                <div class="form-grid">
+                    <!-- Column 1: API Token & Cookie -->
+                    <div>
+                        <div class="form-group">
+                            <label for="tg_bot_token">Telegram Bot Token</label>
+                            <input type="text" class="form-control" id="tg_bot_token" placeholder="输入 TG Bot 的 API Token">
+                        </div>
+                        <div class="form-group">
+                            <label for="tg_chat_id">Telegram Chat ID</label>
+                            <input type="text" class="form-control" id="tg_chat_id" placeholder="输入接收推送的 Chat ID">
+                        </div>
+                        <div class="form-group">
+                            <label for="cookie">NodeSeek Cookie (实现高等级贴解锁)</label>
+                            <textarea class="form-control" id="cookie" placeholder="例如: nsk_session=xxx; nsk_auth=yyy..."></textarea>
+                        </div>
+                    </div>
+                    
+                    <!-- Column 2: Scrape Plan -->
+                    <div>
+                        <div class="form-group">
+                            <label for="schedule_mode">调度频率模式</label>
+                            <select class="form-control" id="schedule_mode" onchange="toggleScheduleFields()">
+                                <option value="cron">每天定时执行 (Cron)</option>
+                                <option value="interval">间隔循环执行 (Interval)</option>
+                                <option value="disabled">禁用自动调度</option>
+                            </select>
+                        </div>
+                        <div class="form-group" id="cron-fields">
+                            <label>每日自动运行时间</label>
+                            <div style="display: flex; gap: 10px;">
+                                <select class="form-control" id="cron_hour" style="flex: 1;"></select>
+                                <select class="form-control" id="cron_minute" style="flex: 1;"></select>
+                            </div>
+                        </div>
+                        <div class="form-group" id="interval-fields" style="display: none;">
+                            <label for="interval_hours">间隔运行周期 (小时)</label>
+                            <input type="number" class="form-control" id="interval_hours" min="1" max="72">
+                        </div>
+                        <div class="form-group">
+                            <label for="crawler_engine">爬虫采集引擎</label>
+                            <select class="form-control" id="crawler_engine">
+                                <option value="curl_cffi">curl_cffi (首选: TLS指纹绕盾，极速轻量)</option>
+                                <option value="playwright">Playwright (后备: 无头浏览器模式)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Column 3: Advanced filtering -->
+                    <div>
+                        <div class="form-group">
+                            <label for="max_pages">每次抓取列表页数上限</label>
+                            <input type="number" class="form-control" id="max_pages" min="1" max="20">
+                        </div>
+                        <div class="form-group">
+                            <label for="page_delay">翻页防风控延迟间隔 (秒)</label>
+                            <input type="number" class="form-control" id="page_delay" min="0" max="10">
+                        </div>
+                        <div class="form-group">
+                            <label for="lucky_keywords">抽奖无意义帖过滤词 (以逗号分隔)</label>
+                            <textarea class="form-control" id="lucky_keywords"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 15px; margin-top: 25px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 20px;">
+                    <button type="submit" class="btn">
+                        <i class="fa-solid fa-floppy-disk"></i>保存配置
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="fetchConfig()">
+                        <i class="fa-solid fa-rotate-left"></i>撤销修改
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Tab switching
+    function switchTab(tabId) {
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+        
+        const activeBtn = Array.from(document.querySelectorAll('.tab-btn')).find(btn => btn.getAttribute('onclick').includes(tabId));
+        if (activeBtn) activeBtn.classList.add('active');
+        
+        document.getElementById(tabId).classList.add('active');
+        
+        if (tabId === 'reader') {
+            fetchHistory();
+        }
+    }
+
+    // Toggle Form fields based on schedule mode
+    function toggleScheduleFields() {
+        const mode = document.getElementById('schedule_mode').value;
+        const cronFields = document.getElementById('cron-fields');
+        const intervalFields = document.getElementById('interval-fields');
+        
+        if (mode === 'cron') {
+            cronFields.style.display = 'block';
+            intervalFields.style.display = 'none';
+        } else if (mode === 'interval') {
+            cronFields.style.display = 'none';
+            intervalFields.style.display = 'block';
+        } else {
+            cronFields.style.display = 'none';
+            intervalFields.style.display = 'none';
+        }
+    }
+
+    // Populate Cron select options
+    function initTimeSelectors() {
+        const hourSel = document.getElementById('cron_hour');
+        const minSel = document.getElementById('cron_minute');
+        
+        for (let i = 0; i < 24; i++) {
+            const opt = document.createElement('option');
+            opt.value = i;
+            opt.textContent = String(i).padStart(2, '0') + ' 时';
+            hourSel.appendChild(opt);
+        }
+        for (let i = 0; i < 60; i += 5) {
+            const opt = document.createElement('option');
+            opt.value = i;
+            opt.textContent = String(i).padStart(2, '0') + ' 分';
+            minSel.appendChild(opt);
+        }
+    }
+
+    // Get config
+    async function fetchConfig() {
+        try {
+            const res = await fetch('/api/config');
+            const data = await res.json();
+            
+            document.getElementById('tg_bot_token').value = data.tg_bot_token || '';
+            document.getElementById('tg_chat_id').value = data.tg_chat_id || '';
+            document.getElementById('cookie').value = data.cookie || '';
+            document.getElementById('schedule_mode').value = data.schedule_mode || 'disabled';
+            document.getElementById('cron_hour').value = data.cron_hour !== undefined ? data.cron_hour : 21;
+            document.getElementById('cron_minute').value = data.cron_minute !== undefined ? data.cron_minute : 30;
+            document.getElementById('interval_hours').value = data.interval_hours || 4;
+            document.getElementById('crawler_engine').value = data.crawler_engine || 'curl_cffi';
+            document.getElementById('max_pages').value = data.max_pages || 5;
+            document.getElementById('page_delay').value = data.page_delay !== undefined ? data.page_delay : 2;
+            document.getElementById('lucky_keywords').value = (data.lucky_keywords || []).join(', ');
+            
+            // Set Dashboard indicators
+            document.getElementById('stat-engine').textContent = data.crawler_engine === 'curl_cffi' ? 'curl_cffi (高效)' : 'Playwright (无头)';
+            document.getElementById('stat-push').textContent = (data.tg_bot_token && data.tg_chat_id) ? '已启用' : '未启用 (无Bot)';
+            
+            let schedText = '已禁用';
+            if (data.schedule_mode === 'cron') {
+                schedText = `每日 ${String(data.cron_hour).padStart(2, '0')}:${String(data.cron_minute).padStart(2, '0')}`;
+            } else if (data.schedule_mode === 'interval') {
+                schedText = `每隔 ${data.interval_hours} 小时`;
+            }
+            document.getElementById('stat-schedule').textContent = schedText;
+
+            toggleScheduleFields();
+        } catch (err) {
+            console.error("加载配置失败:", err);
+        }
+    }
+
+    // Save config
+    async function saveConfig(event) {
+        event.preventDefault();
+        
+        const keywords = document.getElementById('lucky_keywords').value
+            .split(',')
+            .map(x => x.strip ? x.strip() : x.trim())
+            .filter(Boolean);
+            
+        const cfg = {
+            tg_bot_token: document.getElementById('tg_bot_token').value.trim(),
+            tg_chat_id: document.getElementById('tg_chat_id').value.trim(),
+            nodeseek_url: 'https://www.nodeseek.com',
+            cookie: document.getElementById('cookie').value.trim(),
+            max_pages: parseInt(document.getElementById('max_pages').value) || 5,
+            lucky_keywords: keywords,
+            schedule_mode: document.getElementById('schedule_mode').value,
+            cron_hour: parseInt(document.getElementById('cron_hour').value) || 0,
+            cron_minute: parseInt(document.getElementById('cron_minute').value) || 0,
+            interval_hours: parseInt(document.getElementById('interval_hours').value) || 4,
+            crawler_engine: document.getElementById('crawler_engine').value,
+            page_delay: parseInt(document.getElementById('page_delay').value) || 0
+        };
+        
+        try {
+            const res = await fetch('/api/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(cfg)
+            });
+            const data = await res.json();
+            if (data.status === 'success') {
+                alert("配置保存成功！");
+                fetchConfig();
+            } else {
+                alert("配置保存失败: " + data.message);
+            }
+        } catch (err) {
+            alert("保存配置发生网络错误！");
+        }
+    }
+
+    // Poll logs
+    async function startLogsPolling() {
+        const consoleEl = document.getElementById('log-console');
+        
+        setInterval(async () => {
+            try {
+                const res = await fetch('/api/logs');
+                const data = await res.json();
+                
+                if (data.logs && data.logs.length > 0) {
+                    consoleEl.innerHTML = '';
+                    data.logs.forEach(line => {
+                        const lineDiv = document.createElement('div');
+                        lineDiv.className = 'console-line';
+                        
+                        if (line.includes('❌') || line.includes('error') || line.includes('Error') || line.includes('失败')) {
+                            lineDiv.classList.add('error');
+                        } else if (line.includes('🎉') || line.includes('✅') || line.includes('成功')) {
+                            lineDiv.classList.add('success');
+                        } else if (line.includes('📅') || line.includes('⏰') || line.includes('⏱️')) {
+                            lineDiv.classList.add('warn');
+                        }
+                        
+                        lineDiv.textContent = line;
+                        consoleEl.appendChild(lineDiv);
+                    });
+                    
+                    // Auto-scroll
+                    consoleEl.scrollTop = consoleEl.scrollHeight;
+                }
+            } catch (err) {
+                console.error("轮询日志出错:", err);
+            }
+        }, 1500);
+    }
+
+    // Trigger Scrape
+    async function triggerScrape() {
+        if (!confirm("确定要立即触发一次 NodeSeek 热帖抓取与推送任务吗？")) return;
+        try {
+            const res = await fetch('/api/run', { method: 'POST' });
+            const data = await res.json();
+            alert(data.message);
+        } catch (err) {
+            alert("启动抓取任务网络失败");
+        }
+    }
+
+    // Fetch History Posts list
+    async function fetchHistory() {
+        const container = document.getElementById('post-list-container');
+        container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);">正在加载帖子列表...</div>';
+        
+        try {
+            const res = await fetch('/api/history');
+            const posts = await res.json();
+            
+            if (posts.length === 0) {
+                container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);">暂无已存的精选历史，请先在控制台运行抓取。</div>';
+                return;
+            }
+            
+            container.innerHTML = '';
+            posts.forEach(post => {
+                const card = document.createElement('div');
+                card.className = 'feed-card';
+                card.onclick = () => viewPost(post.id, card);
+                
+                card.innerHTML = `
+                    <div class="feed-card-title">${post.title}</div>
+                    <div class="feed-card-meta">
+                        <div class="feed-card-metrics">
+                            <span><i class="fa-regular fa-eye"></i> ${post.views}</span>
+                            <span><i class="fa-regular fa-comment"></i> ${post.comments}</span>
+                        </div>
+                        <span style="color:#00f2fe; font-weight:700;"><i class="fa-solid fa-chart-line"></i> ${post.score}</span>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        } catch (err) {
+            container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--danger);">网络异常，加载列表失败。</div>';
+        }
+    }
+
+    // View post details
+    async function viewPost(postId, cardElement) {
+        document.querySelectorAll('.feed-card').forEach(c => c.classList.remove('active'));
+        if (cardElement) cardElement.classList.add('active');
+        
+        const viewer = document.getElementById('post-viewer-container');
+        viewer.innerHTML = `
+            <div class="viewer-empty">
+                <i class="fa-solid fa-spinner fa-spin"></i>
+                <p>正在拉取 NodeSeek 详情页最新内容 (携带 Cookie 绕 CF 盾)...</p>
+            </div>
+        `;
+        
+        try {
+            const res = await fetch(`/api/post/${postId}`);
+            if (res.status !== 200) {
+                const errData = await res.json();
+                throw new Error(errData.detail || "请求出错");
+            }
+            const data = await res.json();
+            
+            // Render Details HTML
+            let commentsHtml = '';
+            if (data.comments && data.comments.length > 0) {
+                data.comments.forEach(c => {
+                    commentsHtml += `
+                        <div class="comment-item">
+                            <img class="comment-avatar" src="${c.avatar || 'https://www.nodeseek.com/static/image/avatar/android-chrome-192x192.png'}" onerror="this.src='https://www.nodeseek.com/static/image/avatar/android-chrome-192x192.png'">
+                            <div class="comment-content-wrapper">
+                                <div class="comment-header">
+                                    <span class="comment-author">@${c.author}</span>
+                                    <span class="comment-floor">${c.floor}</span>
+                                </div>
+                                <div class="comment-body">${c.content_html}</div>
+                            </div>
+                        </div>
+                    `;
+                });
+            } else {
+                commentsHtml = '<div style="text-align:center;padding:20px;color:var(--text-muted);">该帖子暂无评论，或未过滤出符合条件的评论。</div>';
+            }
+            
+            viewer.innerHTML = `
+                <div class="post-header">
+                    <img class="post-avatar" src="${data.poster_avatar || 'https://www.nodeseek.com/static/image/avatar/android-chrome-192x192.png'}" onerror="this.src='https://www.nodeseek.com/static/image/avatar/android-chrome-192x192.png'">
+                    <div>
+                        <div class="post-title-text">${data.content_html ? '' : '无法加载标题'}${cardElement.querySelector('.feed-card-title').textContent}</div>
+                        <div class="post-meta-info">作者: <b>@${data.poster_name}</b></div>
+                    </div>
+                    <a href="https://www.nodeseek.com/post-${postId}-1" target="_blank" class="btn btn-secondary" style="margin-left:auto; padding:8px 12px; font-size:12px;">
+                        <i class="fa-solid fa-arrow-up-right-from-square"></i>浏览原帖
+                    </a>
+                </div>
+                
+                <div class="post-body">
+                    ${data.content_html}
+                </div>
+                
+                <div class="comments-section">
+                    <h3 style="font-size:16px;font-weight:600;margin-bottom:10px;"><i class="fa-regular fa-comments"></i> 精彩跟帖评论</h3>
+                    ${commentsHtml}
+                </div>
+            `;
+            
+        } catch (err) {
+            viewer.innerHTML = `
+                <div class="viewer-empty" style="color:var(--danger)">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    <p>加载详情失败: ${err.message}</p>
+                    <button class="btn btn-secondary" onclick="viewPost('${postId}', null)">重新加载</button>
+                </div>
+            `;
+        }
+    }
+
+    // Init
+    initTimeSelectors();
+    fetchConfig();
+    startLogsPolling();
+</script>
+</body>
+</html>
