@@ -6,6 +6,7 @@ from pydantic import BaseModel
 import database
 import scheduler
 import nodeseek_digest
+import bot_listener
 
 # 内存日志缓冲处理器，用于在前端控制台实时展示抓取状态
 class MemoryLogHandler(logging.Handler):
@@ -76,6 +77,8 @@ def on_startup():
     database.init_db()
     # 自动调度器初始化与载入
     scheduler.init_scheduler()
+    # 启动 Telegram 消息交互长轮询监听守护线程
+    bot_listener.start_listener()
 
 @app.get("/", response_class=HTMLResponse)
 def serve_index():

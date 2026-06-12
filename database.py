@@ -36,7 +36,9 @@ def init_db():
         score REAL,
         crawler_date TEXT,
         push_status INTEGER DEFAULT 0,
-        ai_summary TEXT
+        ai_summary TEXT,
+        category TEXT,
+        author_uid TEXT
     )
     """)
     conn.commit()
@@ -44,6 +46,20 @@ def init_db():
     # 动态为旧版数据库迁移新增 ai_summary 字段
     try:
         cursor.execute("ALTER TABLE posts ADD COLUMN ai_summary TEXT")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass
+
+    # 动态迁移新增 category 字段
+    try:
+        cursor.execute("ALTER TABLE posts ADD COLUMN category TEXT")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass
+
+    # 动态迁移新增 author_uid 字段
+    try:
+        cursor.execute("ALTER TABLE posts ADD COLUMN author_uid TEXT")
         conn.commit()
     except sqlite3.OperationalError:
         pass
@@ -139,15 +155,17 @@ def save_posts(posts):
         date_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         for post in posts:
             cursor.execute("""
-            INSERT INTO posts (id, title, url, views, comments, score, crawler_date, push_status, ai_summary)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)
+            INSERT INTO posts (id, title, url, views, comments, score, crawler_date, push_status, ai_summary, category, author_uid)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 views=excluded.views,
                 comments=excluded.comments,
                 score=excluded.score,
                 crawler_date=excluded.crawler_date,
-                ai_summary=excluded.ai_summary
-            """, (post["id"], post["title"], post["url"], post["views"], post["comments"], post["score"], date_str, post.get("ai_summary", "")))
+                ai_summary=excluded.ai_summary,
+                category=excluded.category,
+                author_uid=excluded.author_uid
+            """, (post["id"], post["title"], post["url"], post["views"], post["comments"], post["score"], date_str, post.get("ai_summary", ""), post.get("category", "日常"), post.get("author_uid", "")))
         conn.commit()
         conn.close()
 
@@ -219,6 +237,18 @@ def get_post_by_id(post_id):
         row = cursor.fetchone()
         conn.close()
         return dict(row) if row else None
+
+def get_post_category_and_uid(post_id):
+    """根据帖子ID查询其分类和作者UID"""
+    with db_lock:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT category, author_uid FROM posts WHERE id = ?", (post_id,))
+        row = cursor.fetchone()
+        conn.close()
+        if row:
+            return row["category"], row["author_uid"]
+        return None, None
 
 def clear_posts():
     """清空 posts 表中的所有历史热帖数据"""
