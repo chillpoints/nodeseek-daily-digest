@@ -721,6 +721,9 @@ def _run_system_upgrade(token, chat_id, message_id):
     project_dir = os.path.dirname(os.path.abspath(__file__))
     
     try:
+        # 0. 规避 Git 安全目录检测限制
+        subprocess.run(["git", "config", "--global", "--add", "safe.directory", project_dir], capture_output=True, cwd=project_dir, timeout=5)
+        
         # 1. git pull 拉取代码
         logger.info("🤖 自动更新：正在拉取 GitHub 代码...")
         git_res = subprocess.run(["git", "pull"], capture_output=True, text=True, cwd=project_dir, timeout=30)
