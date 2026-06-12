@@ -766,6 +766,60 @@
                                 <option value="playwright">Playwright (后备: 无头浏览器模式)</option>
                             </select>
                         </div>
+
+                        <!-- 时间衰减设置 -->
+                        <div style="margin-top: 20px; border-top: 1px solid rgba(16, 16, 16, 0.08); padding-top: 15px;">
+                            <div style="font-size: 14px; font-weight: 600; margin-bottom: 15px; display: flex; align-items: center; gap: 6px;">
+                                <i class="fa-solid fa-hourglass-half" style="color: #CB4B16;"></i>
+                                <span>时间热度衰减配置</span>
+                            </div>
+                            <div class="form-group">
+                                <label for="time_decay_mode">衰减模型选择</label>
+                                <select class="form-control" id="time_decay_mode" onchange="toggleDecayFields()">
+                                    <option value="hill">希尔双曲S型模型 (Hill S-Curve)</option>
+                                    <option value="exponential">指数级衰减模型 (Exponential)</option>
+                                    <option value="gravity">重力级衰减模型 (Gravity)</option>
+                                    <option value="linear">线性渐变衰减模型 (Linear)</option>
+                                    <option value="disabled">关闭时间衰减 (Disabled)</option>
+                                </select>
+                            </div>
+                            
+                            <!-- 4小时平坦化阈值 -->
+                            <div class="form-group" id="decay-flat-group">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <label for="time_decay_flat_hours">首期完全保鲜时间</label>
+                                    <span id="time_decay_flat_val" style="color: #CB4B16; font-family: 'Space Grotesk', sans-serif; font-weight: bold; font-size: 13px;">4 小时</span>
+                                </div>
+                                <input type="range" class="form-control" id="time_decay_flat_hours" min="0" max="24" step="1" value="4" oninput="document.getElementById('time_decay_flat_val').textContent = this.value + ' 小时'" style="padding: 0; height: auto;">
+                            </div>
+
+                            <!-- 半衰期滑块 (指数, 线性, 希尔模式) -->
+                            <div class="form-group" id="decay-half-life-group">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <label for="time_decay_half_life" id="decay-half-life-label">热度折半周期 (半衰期)</label>
+                                    <span id="time_decay_half_life_val" style="color: #CB4B16; font-family: 'Space Grotesk', sans-serif; font-weight: bold; font-size: 13px;">10 天</span>
+                                </div>
+                                <input type="range" class="form-control" id="time_decay_half_life" min="12" max="720" step="12" value="240" oninput="updateHalfLifeText(this.value)" style="padding: 0; height: auto;">
+                            </div>
+
+                            <!-- 重力系数滑块 -->
+                            <div class="form-group" id="decay-gravity-group" style="display: none;">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <label for="time_decay_gravity">重力消退系数 (G)</label>
+                                    <span id="time_decay_gravity_val" style="color: #CB4B16; font-family: 'Space Grotesk', sans-serif; font-weight: bold; font-size: 13px;">1.0</span>
+                                </div>
+                                <input type="range" class="form-control" id="time_decay_gravity" min="0.1" max="3.0" step="0.1" value="1.0" oninput="document.getElementById('time_decay_gravity_val').textContent = parseFloat(this.value).toFixed(1)" style="padding: 0; height: auto;">
+                            </div>
+
+                            <!-- 希尔协同系数 (陡峭度) -->
+                            <div class="form-group" id="decay-slope-group">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <label for="time_decay_slope">S型曲线陡峭度 (p)</label>
+                                    <span id="time_decay_slope_val" style="color: #CB4B16; font-family: 'Space Grotesk', sans-serif; font-weight: bold; font-size: 13px;">2.0</span>
+                                </div>
+                                <input type="range" class="form-control" id="time_decay_slope" min="1.0" max="5.0" step="0.5" value="2.0" oninput="document.getElementById('time_decay_slope_val').textContent = parseFloat(this.value).toFixed(1)" style="padding: 0; height: auto;">
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Column 3: Advanced filtering -->
@@ -885,6 +939,60 @@
         }
     }
 
+    // Toggle Form fields based on time decay mode
+    function toggleDecayFields() {
+        const mode = document.getElementById('time_decay_mode').value;
+        const flatGroup = document.getElementById('decay-flat-group');
+        const halfLifeGroup = document.getElementById('decay-half-life-group');
+        const gravityGroup = document.getElementById('decay-gravity-group');
+        const slopeGroup = document.getElementById('decay-slope-group');
+        
+        if (mode === 'disabled') {
+            flatGroup.style.display = 'none';
+            halfLifeGroup.style.display = 'none';
+            gravityGroup.style.display = 'none';
+            slopeGroup.style.display = 'none';
+        } else {
+            flatGroup.style.display = 'block';
+            if (mode === 'gravity') {
+                halfLifeGroup.style.display = 'none';
+                gravityGroup.style.display = 'block';
+                slopeGroup.style.display = 'none';
+            } else {
+                halfLifeGroup.style.display = 'block';
+                gravityGroup.style.display = 'none';
+                
+                const labelEl = document.getElementById('decay-half-life-label');
+                if (mode === 'linear') {
+                    labelEl.textContent = '热度完全归零周期';
+                } else {
+                    labelEl.textContent = '热度折半周期 (半衰期)';
+                }
+                
+                if (mode === 'hill') {
+                    slopeGroup.style.display = 'block';
+                } else {
+                    slopeGroup.style.display = 'none';
+                }
+            }
+        }
+    }
+
+    // Update half life text display
+    function updateHalfLifeText(hours) {
+        hours = parseInt(hours);
+        const days = Math.floor(hours / 24);
+        const remainingHours = hours % 24;
+        let text = '';
+        if (days > 0) {
+            text += days + ' 天 ';
+        }
+        if (remainingHours > 0 || days === 0) {
+            text += remainingHours + ' 小时';
+        }
+        document.getElementById('time_decay_half_life_val').textContent = text;
+    }
+
     // Get config
     async function fetchConfig() {
         try {
@@ -907,6 +1015,27 @@
             const pushLimit = data.push_limit !== undefined ? data.push_limit : 10;
             document.getElementById('push_limit').value = pushLimit;
             document.getElementById('push_limit_val').textContent = pushLimit;
+
+            // Bind time decay fields
+            document.getElementById('time_decay_mode').value = data.time_decay_mode || 'hill';
+            
+            const decayFlatHours = data.time_decay_flat_hours !== undefined ? data.time_decay_flat_hours : 4;
+            document.getElementById('time_decay_flat_hours').value = decayFlatHours;
+            document.getElementById('time_decay_flat_val').textContent = decayFlatHours + ' 小时';
+
+            const decayHalfLife = data.time_decay_half_life !== undefined ? data.time_decay_half_life : 240;
+            document.getElementById('time_decay_half_life').value = decayHalfLife;
+            updateHalfLifeText(decayHalfLife);
+
+            const decayGravity = data.time_decay_gravity !== undefined ? data.time_decay_gravity : 1.0;
+            document.getElementById('time_decay_gravity').value = decayGravity;
+            document.getElementById('time_decay_gravity_val').textContent = parseFloat(decayGravity).toFixed(1);
+
+            const decaySlope = data.time_decay_slope !== undefined ? data.time_decay_slope : 2.0;
+            document.getElementById('time_decay_slope').value = decaySlope;
+            document.getElementById('time_decay_slope_val').textContent = parseFloat(decaySlope).toFixed(1);
+
+            toggleDecayFields();
             
             // Set Dashboard indicators
             document.getElementById('stat-engine').textContent = data.crawler_engine === 'curl_cffi' ? 'curl_cffi (高效)' : 'Playwright (无头)';
@@ -994,7 +1123,12 @@
             page_delay: parseInt(document.getElementById('page_delay').value) || 0,
             verbose_log: document.getElementById('verbose_log').value === 'true',
             category_weights: category_weights,
-            push_limit: parseInt(document.getElementById('push_limit').value) || 10
+            push_limit: parseInt(document.getElementById('push_limit').value) || 10,
+            time_decay_mode: document.getElementById('time_decay_mode').value,
+            time_decay_half_life: parseInt(document.getElementById('time_decay_half_life').value) || 240,
+            time_decay_gravity: parseFloat(document.getElementById('time_decay_gravity').value) || 1.0,
+            time_decay_slope: parseFloat(document.getElementById('time_decay_slope').value) || 2.0,
+            time_decay_flat_hours: parseInt(document.getElementById('time_decay_flat_hours').value) || 4
         };
         
         try {

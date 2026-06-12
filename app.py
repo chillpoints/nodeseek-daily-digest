@@ -56,6 +56,11 @@ class ConfigSchema(BaseModel):
     blocked_uids: list
     category_weights: dict
     push_limit: int
+    time_decay_mode: str
+    time_decay_half_life: int
+    time_decay_gravity: float
+    time_decay_slope: float
+    time_decay_flat_hours: int
 
 @app.on_event("startup")
 def on_startup():

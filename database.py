@@ -57,7 +57,12 @@ def init_db():
         "verbose_log": "0",            # 是否开启详细日志 (0-关闭, 1-开启)
         "blocked_uids": "",             # 拉黑过滤特定发帖人 UID (以逗号分隔)
         "category_weights": '{"日常": 0.7, "技术": 1.0, "情报": 1.0, "测评": 0.8, "交易": 0.3, "拼车": 0.3, "推广": 0.3, "生活": 0.2, "Dev": 0.6, "贴图": 0.0, "曝光": 0.5, "内版": 0.0, "沙盒": 0.0}',
-        "push_limit": "10"
+        "push_limit": "10",
+        "time_decay_mode": "hill",
+        "time_decay_half_life": "240",
+        "time_decay_gravity": "1.0",
+        "time_decay_slope": "2.0",
+        "time_decay_flat_hours": "4"
     }
     
     for k, v in default_config.items():
@@ -78,8 +83,13 @@ def get_config():
         val = row["value"]
         if key == "lucky_keywords":
             config[key] = [x.strip() for x in val.split(",") if x.strip()]
-        elif key in ["max_pages", "cron_hour", "cron_minute", "interval_hours", "page_delay", "push_limit"]:
+        elif key in ["max_pages", "cron_hour", "cron_minute", "interval_hours", "page_delay", "push_limit", "time_decay_half_life", "time_decay_flat_hours"]:
             config[key] = int(val) if val.isdigit() else 0
+        elif key in ["time_decay_gravity", "time_decay_slope"]:
+            try:
+                config[key] = float(val)
+            except (ValueError, TypeError):
+                config[key] = 1.0
         elif key == "verbose_log":
             config[key] = (val == "1" or val.lower() == "true")
         elif key == "blocked_uids":

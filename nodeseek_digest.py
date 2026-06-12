@@ -6,6 +6,7 @@ import re
 import time
 import json
 import logging
+import math
 from datetime import datetime
 from curl_cffi import requests
 from bs4 import BeautifulSoup
@@ -39,6 +40,31 @@ def is_recent(time_text):
     if "w ago" in time_text or "month" in time_text or "year" in time_text:
         return False
     return True
+
+def parse_time_to_hours(time_text):
+    """将时间文本解析为相对当前时间的小时数"""
+    time_text = time_text.lower().strip()
+    match = re.search(r'(\d+)\s*(s|m|h|d|w|month|year|秒|分|小时|天|周|月|年)', time_text)
+    if not match:
+        return 1.0
+    val = float(match.group(1))
+    unit = match.group(2)
+    
+    if unit in ['s', '秒']:
+        return val / 3600.0
+    elif unit in ['m', '分', '分钟']:
+        return val / 60.0
+    elif unit in ['h', '小时']:
+        return val
+    elif unit in ['d', '天']:
+        return val * 24.0
+    elif unit in ['w', '周']:
+        return val * 24.0 * 7.0
+    elif unit in ['month', '月']:
+        return val * 24.0 * 30.0
+    elif unit in ['year', '年']:
+        return val * 24.0 * 365.0
+    return 1.0
 
 def fetch_html_playwright(url, cookie):
     """使用 Playwright 无头浏览器方式抓取网页 (解析并携带 Cookie)"""
@@ -168,7 +194,7 @@ def run_digest_job(config=None):
                     logger.info(f"⏳ 过滤非24h活跃贴: {title} (时间: {time_text})")
                 continue
                 
-            # 4. 类别权重与热度计算
+            # 4. 类别权重与时间衰减热度计算
             category_el = item.select_one('a[href^="/categories/"]')
             category = category_el.text.strip() if category_el else "日常"
             category_weights = config.get("category_weights", {})
@@ -178,11 +204,38 @@ def run_digest_job(config=None):
             except (TypeError, ValueError):
                 weight = 1.0
                 
+            # 计算时间衰减因子
+            age_hours = parse_time_to_hours(time_text)
+            time_decay_mode = config.get("time_decay_mode", "hill")
+            time_decay_half_life = config.get("time_decay_half_life", 240)
+            time_decay_gravity = config.get("time_decay_gravity", 1.0)
+            time_decay_slope = config.get("time_decay_slope", 2.0)
+            time_decay_flat_hours = config.get("time_decay_flat_hours", 4)
+            
+            t_adj = max(0.0, age_hours - time_decay_flat_hours)
+            w_time = 1.0
+            
+            if time_decay_mode == "disabled":
+                w_time = 1.0
+            elif time_decay_mode == "exponential":
+                if time_decay_half_life > 0:
+                    lam = math.log(2) / time_decay_half_life
+                    w_time = math.exp(-lam * t_adj)
+            elif time_decay_mode == "gravity":
+                w_time = 1.0 / math.pow(t_adj + 2.0, time_decay_gravity)
+            elif time_decay_mode == "linear":
+                limit = time_decay_half_life * 2.0
+                if limit > 0:
+                    w_time = max(0.01, 1.0 - (t_adj / limit))
+            elif time_decay_mode == "hill":
+                if time_decay_half_life > 0:
+                    w_time = 1.0 / (1.0 + math.pow(t_adj / time_decay_half_life, time_decay_slope))
+                    
             base_score = comments * 5.0 + views * 0.2
-            hot_score = round(base_score * weight, 1)
+            hot_score = round(base_score * weight * w_time, 1)
             
             if verbose:
-                logger.info(f"🔍 解析到帖子: ID={post_id} | 标题={title} | 分类={category}(权重:{weight}) | 阅读={views} | 评论={comments} | 基础得分={round(base_score, 1)} | 加权得分={hot_score}")
+                logger.info(f"🔍 解析到帖子: ID={post_id} | 标题={title} | 分类={category}(权重:{weight}) | 年龄={round(age_hours, 2)}h(平坦化后:{round(t_adj, 2)}h) | 衰减模式={time_decay_mode}(因子:{round(w_time, 3)}) | 阅读={views} | 评论={comments} | 基础得分={round(base_score, 1)} | 加权得分={hot_score}")
                 
             posts.append({
                 "id": post_id,
