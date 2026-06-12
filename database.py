@@ -56,14 +56,15 @@ def init_db():
         "page_delay": "2",             # 防风控间隔 (秒)
         "verbose_log": "0",            # 是否开启详细日志 (0-关闭, 1-开启)
         "blocked_uids": "",             # 拉黑过滤特定发帖人 UID (以逗号分隔)
-        "category_weights": '{"日常": 0.7, "技术": 1.0, "情报": 1.0, "测评": 0.8, "交易": 0.3, "拼车": 0.3, "推广": 0.3, "生活": 0.2, "Dev": 0.6, "贴图": 0.0, "曝光": 0.5, "内版": 0.0, "沙盒": 0.0}'
+        "category_weights": '{"日常": 0.7, "技术": 1.0, "情报": 1.0, "测评": 0.8, "交易": 0.3, "拼车": 0.3, "推广": 0.3, "生活": 0.2, "Dev": 0.6, "贴图": 0.0, "曝光": 0.5, "内版": 0.0, "沙盒": 0.0}',
+        "push_limit": "10"
     }
     
     for k, v in default_config.items():
         cursor.execute("INSERT OR IGNORE INTO config (key, value) VALUES (?, ?)", (k, v))
     conn.commit()
     conn.close()
-
+ 
 def get_config():
     with db_lock:
         conn = get_db()
@@ -77,7 +78,7 @@ def get_config():
         val = row["value"]
         if key == "lucky_keywords":
             config[key] = [x.strip() for x in val.split(",") if x.strip()]
-        elif key in ["max_pages", "cron_hour", "cron_minute", "interval_hours", "page_delay"]:
+        elif key in ["max_pages", "cron_hour", "cron_minute", "interval_hours", "page_delay", "push_limit"]:
             config[key] = int(val) if val.isdigit() else 0
         elif key == "verbose_log":
             config[key] = (val == "1" or val.lower() == "true")

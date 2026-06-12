@@ -687,6 +687,13 @@
                     <!-- Column 3: Advanced filtering -->
                     <div>
                         <div class="form-group">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <label for="push_limit">每次推送热帖数量</label>
+                                <span id="push_limit_val" style="color: #CB4B16; font-family: 'Space Grotesk', monospace; font-weight: bold; font-size: 14px;">10</span>
+                            </div>
+                            <input type="range" class="form-control" id="push_limit" min="5" max="100" step="5" value="10" oninput="document.getElementById('push_limit_val').textContent = this.value" style="padding: 0; height: auto; accent-color: #CB4B16; cursor: pointer;">
+                        </div>
+                        <div class="form-group">
                             <label for="max_pages">每次抓取列表页数上限</label>
                             <input type="number" class="form-control" id="max_pages" min="1" max="20">
                         </div>
@@ -813,6 +820,9 @@
             document.getElementById('verbose_log').value = data.verbose_log ? 'true' : 'false';
             document.getElementById('blocked_uids').value = (data.blocked_uids || []).join(', ');
             document.getElementById('lucky_keywords').value = (data.lucky_keywords || []).join(', ');
+            const pushLimit = data.push_limit !== undefined ? data.push_limit : 10;
+            document.getElementById('push_limit').value = pushLimit;
+            document.getElementById('push_limit_val').textContent = pushLimit;
             
             // Set Dashboard indicators
             document.getElementById('stat-engine').textContent = data.crawler_engine === 'curl_cffi' ? 'curl_cffi (高效)' : 'Playwright (无头)';
@@ -899,7 +909,8 @@
             crawler_engine: document.getElementById('crawler_engine').value,
             page_delay: parseInt(document.getElementById('page_delay').value) || 0,
             verbose_log: document.getElementById('verbose_log').value === 'true',
-            category_weights: category_weights
+            category_weights: category_weights,
+            push_limit: parseInt(document.getElementById('push_limit').value) || 10
         };
         
         try {

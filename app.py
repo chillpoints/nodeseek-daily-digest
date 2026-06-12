@@ -55,6 +55,7 @@ class ConfigSchema(BaseModel):
     verbose_log: bool
     blocked_uids: list
     category_weights: dict
+    push_limit: int
 
 @app.on_event("startup")
 def on_startup():

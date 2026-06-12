@@ -106,6 +106,7 @@ def run_digest_job(config=None):
     lucky_keywords = config["lucky_keywords"]
     page_delay = config.get("page_delay", 2)
     blocked_uids = config.get("blocked_uids", [])
+    push_limit = config.get("push_limit", 10)
     
     verbose = config.get("verbose_log", False)
     posts = []
@@ -197,7 +198,7 @@ def run_digest_job(config=None):
             
     # 去重并排序
     unique_posts = {p['id']: p for p in posts}.values()
-    sorted_posts = sorted(unique_posts, key=lambda x: x['score'], reverse=True)[:10]
+    sorted_posts = sorted(unique_posts, key=lambda x: x['score'], reverse=True)[:push_limit]
     
     # 持久化保存到本地 SQLite 数据库中（默认未推送 push_status=0）
     if sorted_posts:
@@ -257,8 +258,9 @@ def push_pending_digests(config=None):
         logger.info("ℹ️ 未配置 Telegram Bot 参数，跳过自动推送。")
         return
         
+    push_limit = config.get("push_limit", 10)
     # 获取未推送的高热度帖子
-    pending_posts = database.get_pending_push_posts(limit=10)
+    pending_posts = database.get_pending_push_posts(limit=push_limit)
     if not pending_posts:
         logger.info("ℹ️ 没有未推送的候选热帖。")
         return
@@ -283,7 +285,8 @@ def push_recent_hot_posts(config=None):
         logger.warning("ℹ️ 未配置 Telegram Bot 参数，无法执行单独推送任务。")
         return False
         
-    posts = database.get_recent_hot_posts(hours=24, limit=10)
+    push_limit = config.get("push_limit", 10)
+    posts = database.get_recent_hot_posts(hours=24, limit=push_limit)
     if not posts:
         logger.warning("⚠️ 数据库中没有过去 24 小时内抓取到的历史热帖数据，跳过推送。")
         return False
