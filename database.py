@@ -1,6 +1,7 @@
 import sqlite3
 import os
 import threading
+import json
 from datetime import datetime
 
 # 全局 SQLite 连接互斥锁，确保并发读写安全
@@ -54,7 +55,8 @@ def init_db():
         "crawler_engine": "curl_cffi", # 'curl_cffi', 'playwright'
         "page_delay": "2",             # 防风控间隔 (秒)
         "verbose_log": "0",            # 是否开启详细日志 (0-关闭, 1-开启)
-        "blocked_uids": ""             # 拉黑过滤特定发帖人 UID (以逗号分隔)
+        "blocked_uids": "",             # 拉黑过滤特定发帖人 UID (以逗号分隔)
+        "category_weights": '{"日常": 0.7, "技术": 1.0, "情报": 1.0, "测评": 0.8, "交易": 0.3, "拼车": 0.3, "推广": 0.3, "生活": 0.2, "Dev": 0.6, "贴图": 0.0, "曝光": 0.5, "内版": 0.0, "沙盒": 0.0}'
     }
     
     for k, v in default_config.items():
@@ -81,6 +83,11 @@ def get_config():
             config[key] = (val == "1" or val.lower() == "true")
         elif key == "blocked_uids":
             config[key] = [x.strip() for x in val.split(",") if x.strip()]
+        elif key == "category_weights":
+            try:
+                config[key] = json.loads(val)
+            except Exception:
+                config[key] = {}
         else:
             config[key] = val
     return config
@@ -92,6 +99,8 @@ def update_config(new_config):
         for k, v in new_config.items():
             if k in ["lucky_keywords", "blocked_uids"] and isinstance(v, list):
                 v = ",".join(v)
+            elif k == "category_weights" and isinstance(v, dict):
+                v = json.dumps(v, ensure_ascii=False)
             cursor.execute("INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)", (k, str(v)))
     conn.commit()
     conn.close()

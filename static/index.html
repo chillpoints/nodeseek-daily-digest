@@ -709,6 +709,17 @@
                     </div>
                 </div>
 
+                <!-- 板块权重调整 -->
+                <div style="margin-top: 30px; border-top: 1px solid rgba(16, 16, 16, 0.08); padding-top: 25px;">
+                    <div style="font-size: 16px; font-weight: 600; margin-bottom: 20px; display: flex; align-items: center; gap: 8px;">
+                        <i class="fa-solid fa-weight-hanging" style="color: #CB4B16;"></i>
+                        <span>板块热度权重微调</span>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px;" id="category-weights-container">
+                        <!-- 由 JS 动态生成 -->
+                    </div>
+                </div>
+
                 <div style="display: flex; gap: 15px; margin-top: 25px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 20px;">
                     <button type="submit" class="btn">
                         <i class="fa-solid fa-floppy-disk"></i>保存配置
@@ -723,6 +734,11 @@
 </div>
 
 <script>
+    const CATEGORIES = ["日常", "技术", "情报", "测评", "交易", "拼车", "推广", "生活", "Dev", "贴图", "曝光", "内版", "沙盒"];
+    const DEFAULT_WEIGHTS = {
+        "日常": 0.7, "技术": 1.0, "情报": 1.0, "测评": 0.8, "交易": 0.3, "拼车": 0.3, "推广": 0.3, "生活": 0.2, "Dev": 0.6, "贴图": 0.0, "曝光": 0.5, "内版": 0.0, "沙盒": 0.0
+    };
+
     // Tab switching
     function switchTab(tabId) {
         document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -808,6 +824,34 @@
             document.getElementById('stat-schedule').textContent = schedText;
 
             toggleScheduleFields();
+
+            // Populate category weights
+            const weights = data.category_weights || {};
+            const weightsContainer = document.getElementById('category-weights-container');
+            if (weightsContainer) {
+                weightsContainer.innerHTML = '';
+                CATEGORIES.forEach(cat => {
+                    const val = weights[cat] !== undefined ? weights[cat] : (DEFAULT_WEIGHTS[cat] !== undefined ? DEFAULT_WEIGHTS[cat] : 1.0);
+                    const sliderDiv = document.createElement('div');
+                    sliderDiv.className = 'weight-slider-group';
+                    sliderDiv.style.background = 'var(--bg-color)';
+                    sliderDiv.style.border = '1px solid var(--card-border)';
+                    sliderDiv.style.padding = '12px 16px';
+                    sliderDiv.style.borderRadius = '12px';
+                    sliderDiv.style.display = 'flex';
+                    sliderDiv.style.flexDirection = 'column';
+                    sliderDiv.style.gap = '8px';
+                    
+                    sliderDiv.innerHTML = `
+                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 600;">
+                            <span>${cat}</span>
+                            <span id="weight-val-${cat}" style="color: #CB4B16; font-family: 'Space Grotesk', monospace; font-weight: bold;">${parseFloat(val).toFixed(1)}</span>
+                        </div>
+                        <input type="range" class="weight-slider" id="weight-input-${cat}" min="0" max="2" step="0.1" value="${val}" oninput="document.getElementById('weight-val-${cat}').textContent = parseFloat(this.value).toFixed(1)" style="width: 100%; accent-color: #CB4B16; cursor: pointer;">
+                    `;
+                    weightsContainer.appendChild(sliderDiv);
+                });
+            }
         } catch (err) {
             console.error("加载配置失败:", err);
         }
@@ -827,6 +871,16 @@
             .map(x => x.strip ? x.strip() : x.trim())
             .filter(Boolean);
             
+        const category_weights = {};
+        CATEGORIES.forEach(cat => {
+            const inputEl = document.getElementById(`weight-input-${cat}`);
+            if (inputEl) {
+                category_weights[cat] = parseFloat(inputEl.value);
+            } else {
+                category_weights[cat] = DEFAULT_WEIGHTS[cat] !== undefined ? DEFAULT_WEIGHTS[cat] : 1.0;
+            }
+        });
+            
         const cfg = {
             tg_bot_token: document.getElementById('tg_bot_token').value.trim(),
             tg_chat_id: document.getElementById('tg_chat_id').value.trim(),
@@ -841,7 +895,8 @@
             interval_hours: parseInt(document.getElementById('interval_hours').value) || 4,
             crawler_engine: document.getElementById('crawler_engine').value,
             page_delay: parseInt(document.getElementById('page_delay').value) || 0,
-            verbose_log: document.getElementById('verbose_log').value === 'true'
+            verbose_log: document.getElementById('verbose_log').value === 'true',
+            category_weights: category_weights
         };
         
         try {

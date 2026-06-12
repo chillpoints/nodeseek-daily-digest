@@ -54,6 +54,7 @@ class ConfigSchema(BaseModel):
     page_delay: int
     verbose_log: bool
     blocked_uids: list
+    category_weights: dict
 
 @app.on_event("startup")
 def on_startup():

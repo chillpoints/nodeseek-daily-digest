@@ -167,11 +167,21 @@ def run_digest_job(config=None):
                     logger.info(f"⏳ 过滤非24h活跃贴: {title} (时间: {time_text})")
                 continue
                 
-            # 4. 热度计算
-            hot_score = round(comments * 5.0 + views * 0.2, 1)
+            # 4. 类别权重与热度计算
+            category_el = item.select_one('a[href^="/categories/"]')
+            category = category_el.text.strip() if category_el else "日常"
+            category_weights = config.get("category_weights", {})
+            weight = category_weights.get(category, 1.0)
+            try:
+                weight = float(weight)
+            except (TypeError, ValueError):
+                weight = 1.0
+                
+            base_score = comments * 5.0 + views * 0.2
+            hot_score = round(base_score * weight, 1)
             
             if verbose:
-                logger.info(f"🔍 解析到帖子: ID={post_id} | 标题={title} | 阅读={views} | 评论={comments} | 得分={hot_score}")
+                logger.info(f"🔍 解析到帖子: ID={post_id} | 标题={title} | 分类={category}(权重:{weight}) | 阅读={views} | 评论={comments} | 基础得分={round(base_score, 1)} | 加权得分={hot_score}")
                 
             posts.append({
                 "id": post_id,
