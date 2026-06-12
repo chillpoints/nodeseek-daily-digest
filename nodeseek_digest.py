@@ -431,14 +431,15 @@ def send_to_telegram(posts, token, chat_id_str):
     
     success_count = 0
     for cid in chat_ids:
-        logger.info(f"📡 正在向目标 {cid} 发送推送通知 (附带交互按钮)...")
+        logger.info(f"📡 正在向目标 {cid} 发送推送通知...")
         payload = {
             "chat_id": cid,
             "text": html_msg,
             "parse_mode": "HTML",
-            "disable_web_page_preview": True,
-            "reply_markup": reply_markup
+            "disable_web_page_preview": True
         }
+        if keyboard_rows:
+            payload["reply_markup"] = reply_markup
         try:
             res = requests.post(telegram_url, json=payload, impersonate="chrome120", timeout=10)
             if res.status_code == 200:

@@ -244,9 +244,10 @@ def _send_message(token, chat_id, text, reply_markup=None):
     payload = {
         "chat_id": chat_id,
         "text": text,
-        "parse_mode": "HTML",
-        "reply_markup": reply_markup
+        "parse_mode": "HTML"
     }
+    if reply_markup is not None:
+        payload["reply_markup"] = reply_markup
     try:
         res = requests.post(url, json=payload, impersonate="chrome120", timeout=10)
         if res.status_code != 200:
@@ -261,9 +262,13 @@ def _edit_message(token, chat_id, message_id, text, reply_markup=None):
         "chat_id": chat_id,
         "message_id": message_id,
         "text": text,
-        "parse_mode": "HTML",
-        "reply_markup": reply_markup
+        "parse_mode": "HTML"
     }
+    if reply_markup is not None:
+        payload["reply_markup"] = reply_markup
+    else:
+        # 传入空键盘清除旧的 Inline Keyboard 按钮，防止 Telegram API 报错
+        payload["reply_markup"] = {"inline_keyboard": []}
     try:
         res = requests.post(url, json=payload, impersonate="chrome120", timeout=10)
         if res.status_code != 200:
