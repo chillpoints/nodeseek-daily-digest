@@ -35,10 +35,18 @@ def init_db():
         comments INTEGER,
         score REAL,
         crawler_date TEXT,
-        push_status INTEGER DEFAULT 0
+        push_status INTEGER DEFAULT 0,
+        ai_summary TEXT
     )
     """)
     conn.commit()
+    
+    # 动态为旧版数据库迁移新增 ai_summary 字段
+    try:
+        cursor.execute("ALTER TABLE posts ADD COLUMN ai_summary TEXT")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass
     
     # 设定系统初始默认配置
     default_config = {
@@ -62,7 +70,15 @@ def init_db():
         "time_decay_half_life": "240",
         "time_decay_gravity": "1.0",
         "time_decay_slope": "2.0",
-        "time_decay_flat_hours": "4"
+        "time_decay_flat_hours": "4",
+        "ai_enabled": "0",
+        "ai_api_key": "",
+        "ai_base_url": "https://api.openai.com/v1",
+        "ai_model": "gpt-4o-mini",
+        "ai_filter_enabled": "0",
+        "ai_filter_prompt": "只保留与 VPS、软路由、网络优化相关的技术帖或有价值情报，剔除日常水帖或交易买卖贴。",
+        "ai_summary_enabled": "0",
+        "ai_summary_prompt": "请用中文简明扼要地总结以下 NodeSeek 热门帖子的核心看点和主要讨论方向。"
     }
     
     for k, v in default_config.items():
@@ -90,7 +106,7 @@ def get_config():
                 config[key] = float(val)
             except (ValueError, TypeError):
                 config[key] = 1.0
-        elif key == "verbose_log":
+        elif key in ["verbose_log", "ai_enabled", "ai_filter_enabled", "ai_summary_enabled"]:
             config[key] = (val == "1" or val.lower() == "true")
         elif key == "blocked_uids":
             config[key] = [x.strip() for x in val.split(",") if x.strip()]
@@ -123,14 +139,15 @@ def save_posts(posts):
         date_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         for post in posts:
             cursor.execute("""
-            INSERT INTO posts (id, title, url, views, comments, score, crawler_date, push_status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 0)
+            INSERT INTO posts (id, title, url, views, comments, score, crawler_date, push_status, ai_summary)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)
             ON CONFLICT(id) DO UPDATE SET
                 views=excluded.views,
                 comments=excluded.comments,
                 score=excluded.score,
-                crawler_date=excluded.crawler_date
-            """, (post["id"], post["title"], post["url"], post["views"], post["comments"], post["score"], date_str))
+                crawler_date=excluded.crawler_date,
+                ai_summary=excluded.ai_summary
+            """, (post["id"], post["title"], post["url"], post["views"], post["comments"], post["score"], date_str, post.get("ai_summary", "")))
         conn.commit()
         conn.close()
 
@@ -138,7 +155,7 @@ def get_posts_history(limit=50):
     with db_lock:
         conn = get_db()
         cursor = conn.cursor()
-        cursor.execute("SELECT id, title, url, views, comments, score, crawler_date FROM posts ORDER BY crawler_date DESC LIMIT ?", (limit,))
+        cursor.execute("SELECT id, title, url, views, comments, score, crawler_date, ai_summary FROM posts ORDER BY crawler_date DESC LIMIT ?", (limit,))
         rows = cursor.fetchall()
         conn.close()
         return [dict(r) for r in rows]
@@ -149,7 +166,7 @@ def get_pending_push_posts(limit=10):
         conn = get_db()
         cursor = conn.cursor()
         cursor.execute("""
-        SELECT id, title, url, views, comments, score, crawler_date
+        SELECT id, title, url, views, comments, score, crawler_date, ai_summary
         FROM posts
         WHERE push_status = 0
         ORDER BY score DESC
@@ -183,7 +200,7 @@ def get_recent_hot_posts(hours=24, limit=10):
         cursor = conn.cursor()
         threshold_time = (datetime.now() - timedelta(hours=hours)).strftime("%Y-%m-%d %H:%M:%S")
         cursor.execute("""
-        SELECT id, title, url, views, comments, score, crawler_date
+        SELECT id, title, url, views, comments, score, crawler_date, ai_summary
         FROM posts
         WHERE crawler_date >= ?
         ORDER BY score DESC
@@ -192,6 +209,16 @@ def get_recent_hot_posts(hours=24, limit=10):
         rows = cursor.fetchall()
         conn.close()
         return [dict(r) for r in rows]
+
+def get_post_by_id(post_id):
+    """根据ID查找本地已存帖子详情"""
+    with db_lock:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, title, url, views, comments, score, crawler_date, ai_summary, push_status FROM posts WHERE id = ?", (post_id,))
+        row = cursor.fetchone()
+        conn.close()
+        return dict(row) if row else None
 
 def clear_posts():
     """清空 posts 表中的所有历史热帖数据"""

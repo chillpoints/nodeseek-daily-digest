@@ -868,6 +868,70 @@
                     </div>
                 </div>
 
+                <!-- AI 智能辅助服务 -->
+                <div style="margin-top: 30px; border-top: 1px solid rgba(16, 16, 16, 0.08); padding-top: 25px;">
+                    <div style="font-size: 16px; font-weight: 600; margin-bottom: 20px; display: flex; align-items: center; gap: 8px;">
+                        <i class="fa-solid fa-robot" style="color: #CB4B16;"></i>
+                        <span>AI 智能辅助服务 (支持 OpenAI / DeepSeek / OpenRouter)</span>
+                    </div>
+                    <div class="form-grid">
+                        <!-- API 基础信息 -->
+                        <div>
+                            <div class="form-group">
+                                <label for="ai_enabled">开启 AI 智能分析</label>
+                                <select class="form-control" id="ai_enabled" onchange="toggleAIFields()">
+                                    <option value="false">关闭 AI 智能服务</option>
+                                    <option value="true">开启 AI 智能服务</option>
+                                </select>
+                            </div>
+                            <div class="ai-fields-container" style="display: none;">
+                                <div class="form-group">
+                                    <label for="ai_api_key">API Key (密钥)</label>
+                                    <input type="password" class="form-control" id="ai_api_key" placeholder="输入 sk- 格式 API Key">
+                                </div>
+                                <div class="form-group">
+                                    <label for="ai_base_url">API Base URL</label>
+                                    <input type="text" class="form-control" id="ai_base_url" placeholder="默认: https://api.openai.com/v1">
+                                </div>
+                                <div class="form-group">
+                                    <label for="ai_model">API 模型 (Model)</label>
+                                    <input type="text" class="form-control" id="ai_model" placeholder="默认: gpt-4o-mini">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 智能帖子过滤 -->
+                        <div class="ai-fields-container" style="display: none;">
+                            <div class="form-group">
+                                <label for="ai_filter_enabled">AI 语义匹配过滤筛选</label>
+                                <select class="form-control" id="ai_filter_enabled" onchange="toggleAIFilterFields()">
+                                    <option value="false">关闭 AI 过滤 (仅使用基础/板块权重)</option>
+                                    <option value="true">开启 AI 过滤 (根据语义自定义筛选)</option>
+                                </select>
+                            </div>
+                            <div class="form-group" id="ai-filter-prompt-group" style="display: none;">
+                                <label for="ai_filter_prompt">AI 筛选自定义要求 (Prompt)</label>
+                                <textarea class="form-control" id="ai_filter_prompt" rows="5" placeholder="只保留与 VPS、软路由、网络优化相关的技术帖或有价值情报，剔除日常水帖或交易买卖贴。"></textarea>
+                            </div>
+                        </div>
+
+                        <!-- 智能热帖总结 -->
+                        <div class="ai-fields-container" style="display: none;">
+                            <div class="form-group">
+                                <label for="ai_summary_enabled">AI 热帖摘要总结</label>
+                                <select class="form-control" id="ai_summary_enabled" onchange="toggleAISummaryFields()">
+                                    <option value="false">关闭 AI 摘要</option>
+                                    <option value="true">开启 AI 摘要 (自动提取热帖内容做总结)</option>
+                                </select>
+                            </div>
+                            <div class="form-group" id="ai-summary-prompt-group" style="display: none;">
+                                <label for="ai_summary_prompt">AI 摘要自定义要求 (Prompt)</label>
+                                <textarea class="form-control" id="ai_summary_prompt" rows="5" placeholder="请用中文简明扼要地总结以下 NodeSeek 热门帖子的核心看点和主要讨论方向。"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div style="display: flex; gap: 15px; margin-top: 25px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 20px;">
                     <button type="submit" class="btn">
                         <i class="fa-solid fa-floppy-disk"></i>保存配置
@@ -993,6 +1057,28 @@
         document.getElementById('time_decay_half_life_val').textContent = text;
     }
 
+    // Toggle Form fields based on AI settings
+    function toggleAIFields() {
+        const enabled = document.getElementById('ai_enabled').value === 'true';
+        document.querySelectorAll('.ai-fields-container').forEach(el => {
+            el.style.display = enabled ? 'block' : 'none';
+        });
+        if (enabled) {
+            toggleAIFilterFields();
+            toggleAISummaryFields();
+        }
+    }
+
+    function toggleAIFilterFields() {
+        const filterEnabled = document.getElementById('ai_filter_enabled').value === 'true';
+        document.getElementById('ai-filter-prompt-group').style.display = filterEnabled ? 'block' : 'none';
+    }
+
+    function toggleAISummaryFields() {
+        const summaryEnabled = document.getElementById('ai_summary_enabled').value === 'true';
+        document.getElementById('ai-summary-prompt-group').style.display = summaryEnabled ? 'block' : 'none';
+    }
+
     // Get config
     async function fetchConfig() {
         try {
@@ -1036,6 +1122,18 @@
             document.getElementById('time_decay_slope_val').textContent = parseFloat(decaySlope).toFixed(1);
 
             toggleDecayFields();
+
+            // Bind AI fields
+            document.getElementById('ai_enabled').value = data.ai_enabled ? 'true' : 'false';
+            document.getElementById('ai_api_key').value = data.ai_api_key || '';
+            document.getElementById('ai_base_url').value = data.ai_base_url || 'https://api.openai.com/v1';
+            document.getElementById('ai_model').value = data.ai_model || 'gpt-4o-mini';
+            document.getElementById('ai_filter_enabled').value = data.ai_filter_enabled ? 'true' : 'false';
+            document.getElementById('ai_filter_prompt').value = data.ai_filter_prompt || '';
+            document.getElementById('ai_summary_enabled').value = data.ai_summary_enabled ? 'true' : 'false';
+            document.getElementById('ai_summary_prompt').value = data.ai_summary_prompt || '';
+
+            toggleAIFields();
             
             // Set Dashboard indicators
             document.getElementById('stat-engine').textContent = data.crawler_engine === 'curl_cffi' ? 'curl_cffi (高效)' : 'Playwright (无头)';
@@ -1128,7 +1226,15 @@
             time_decay_half_life: parseInt(document.getElementById('time_decay_half_life').value) || 240,
             time_decay_gravity: parseFloat(document.getElementById('time_decay_gravity').value) || 1.0,
             time_decay_slope: parseFloat(document.getElementById('time_decay_slope').value) || 2.0,
-            time_decay_flat_hours: parseInt(document.getElementById('time_decay_flat_hours').value) || 4
+            time_decay_flat_hours: parseInt(document.getElementById('time_decay_flat_hours').value) || 4,
+            ai_enabled: document.getElementById('ai_enabled').value === 'true',
+            ai_api_key: document.getElementById('ai_api_key').value.trim(),
+            ai_base_url: document.getElementById('ai_base_url').value.trim(),
+            ai_model: document.getElementById('ai_model').value.trim(),
+            ai_filter_enabled: document.getElementById('ai_filter_enabled').value === 'true',
+            ai_filter_prompt: document.getElementById('ai_filter_prompt').value.trim(),
+            ai_summary_enabled: document.getElementById('ai_summary_enabled').value === 'true',
+            ai_summary_prompt: document.getElementById('ai_summary_prompt').value.trim()
         };
         
         try {
@@ -1308,6 +1414,25 @@
                 commentsHtml = '<div style="text-align:center;padding:20px;color:var(--text-muted);">该帖子暂无评论，或未过滤出符合条件的评论。</div>';
             }
             
+            // AI Summary Box
+            let aiSummaryHtml = '';
+            if (data.ai_summary) {
+                aiSummaryHtml = `
+                    <div class="ai-summary-callout" style="background: rgba(203, 75, 22, 0.04); border: 1px solid rgba(203, 75, 22, 0.15); border-radius: 12px; padding: 16px 20px; margin-bottom: 25px; display: flex; gap: 14px; align-items: flex-start; box-shadow: 0 4px 20px rgba(203, 75, 22, 0.02);">
+                        <i class="fa-solid fa-robot" style="color: #CB4B16; font-size: 20px; margin-top: 2px;"></i>
+                        <div>
+                            <div style="font-weight: 700; font-size: 13px; color: #CB4B16; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; text-transform: uppercase; letter-spacing: 0.5px;">
+                                <span>AI 智能提炼摘要</span>
+                                <span style="font-size: 9px; font-weight: normal; background: rgba(203, 75, 22, 0.1); padding: 1px 6px; border-radius: 4px; color: #CB4B16; font-family: 'Space Grotesk', sans-serif;">Generated</span>
+                            </div>
+                            <div style="font-size: 14px; line-height: 1.65; color: var(--text-main); font-style: italic; font-weight: 500;">
+                                ${data.ai_summary}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
             viewer.innerHTML = `
                 <div class="post-header">
                     <img class="post-avatar" src="${data.poster_avatar || 'https://www.nodeseek.com/static/image/avatar/android-chrome-192x192.png'}" onerror="this.src='https://www.nodeseek.com/static/image/avatar/android-chrome-192x192.png'">
@@ -1319,6 +1444,8 @@
                         <i class="fa-solid fa-arrow-up-right-from-square"></i>浏览原帖
                     </a>
                 </div>
+                
+                ${aiSummaryHtml}
                 
                 <div class="post-body">
                     ${data.content_html}

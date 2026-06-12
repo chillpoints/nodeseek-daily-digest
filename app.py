@@ -61,6 +61,14 @@ class ConfigSchema(BaseModel):
     time_decay_gravity: float
     time_decay_slope: float
     time_decay_flat_hours: int
+    ai_enabled: bool
+    ai_api_key: str
+    ai_base_url: str
+    ai_model: str
+    ai_filter_enabled: bool
+    ai_filter_prompt: str
+    ai_summary_enabled: bool
+    ai_summary_prompt: str
 
 @app.on_event("startup")
 def on_startup():
@@ -119,7 +127,12 @@ def clear_local_posts():
 
 @app.get("/api/post/{post_id}")
 def fetch_post_details(post_id: str):
+    db_post = database.get_post_by_id(post_id)
+    ai_summary = db_post.get("ai_summary", "") if db_post else ""
+    
     details = nodeseek_digest.crawl_post_details(post_id)
     if "error" in details:
         raise HTTPException(status_code=500, detail=details["error"])
+        
+    details["ai_summary"] = ai_summary
     return details

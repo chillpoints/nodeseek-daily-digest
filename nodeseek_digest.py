@@ -32,14 +32,79 @@ def parse_count(text):
     factor = 10000 if unit in ["万", "w"] else (1000 if unit in ["千", "k"] else 1)
     return int(val * factor)
 
-def is_recent(time_text):
-    """过滤24小时以外的帖子，只保留近期活跃贴"""
+def is_recent(time_text, time_decay_mode="disabled"):
+    """过滤过期的帖子，只保留近期活跃贴"""
     time_text = time_text.lower().strip()
-    if "d ago" in time_text and not time_text.startswith("1d"):
-        return False
-    if "w ago" in time_text or "month" in time_text or "year" in time_text:
-        return False
-    return True
+    if time_decay_mode == "disabled":
+        if "d ago" in time_text and not time_text.startswith("1d"):
+            return False
+        if "天前" in time_text and not time_text.startswith("1天"):
+            return False
+        if any(x in time_text for x in ["w ago", "month", "year", "周前", "个月前", "年前"]):
+            return False
+        return True
+    else:
+        # 宽松过滤，放宽到 30 天，只过滤超过月的帖子
+        if any(x in time_text for x in ["month", "year", "个月前", "年前"]):
+            return False
+        match = re.search(r'(\d+)\s*(w ago|周前)', time_text)
+        if match:
+            try:
+                weeks = int(match.group(1))
+                if weeks >= 4:
+                    return False
+            except Exception:
+                pass
+        return True
+
+def clean_html_to_text(html_content):
+    """剔除 HTML 标签，返回干净的纯文本"""
+    if not html_content:
+        return ""
+    soup = BeautifulSoup(html_content, 'html.parser')
+    return soup.get_text(separator="\n", strip=True)
+
+def call_openai_api(config, system_prompt, user_content):
+    """调用符合 OpenAI 规范的 API 接口"""
+    api_key = config.get("ai_api_key", "").strip()
+    base_url = config.get("ai_base_url", "https://api.openai.com/v1").strip()
+    model = config.get("ai_model", "gpt-4o-mini").strip()
+    
+    if not api_key:
+        logger.warning("⚠️ AI 服务已启用但未配置 API Key！")
+        return None
+        
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    
+    url = base_url
+    if not url.endswith("/chat/completions"):
+        url = url.rstrip("/") + "/chat/completions"
+        
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_content}
+        ],
+        "temperature": 0.3
+    }
+    
+    try:
+        logger.info(f"🤖 正在调用 AI 接口 ({model})... API 地址: {url}")
+        res = requests.post(url, headers=headers, json=payload, impersonate="chrome120", timeout=30)
+        if res.status_code == 200:
+            data = res.json()
+            result = data["choices"][0]["message"]["content"].strip()
+            return result
+        else:
+            logger.error(f"❌ AI API 响应错误: {res.status_code} - {res.text}")
+            return None
+    except Exception as e:
+        logger.error(f"❌ AI API 请求发生异常: {e}")
+        return None
 
 def parse_time_to_hours(time_text):
     """将时间文本解析为相对当前时间的小时数"""
@@ -186,12 +251,13 @@ def run_digest_job(config=None):
             views = parse_count(views_el.text) if views_el else 0
             comments = parse_count(comments_el.text) if comments_el else 0
             
-            # 3. 过滤非24小时活跃贴
+            # 3. 过滤非活跃贴
             time_el = item.select_one('.info-last-comment-time time')
             time_text = time_el.text if time_el else "1s ago"
-            if not is_recent(time_text):
+            time_decay_mode = config.get("time_decay_mode", "hill")
+            if not is_recent(time_text, time_decay_mode=time_decay_mode):
                 if verbose:
-                    logger.info(f"⏳ 过滤非24h活跃贴: {title} (时间: {time_text})")
+                    logger.info(f"⏳ 过滤非近期活跃贴: {title} (时间: {time_text})")
                 continue
                 
             # 4. 类别权重与时间衰减热度计算
@@ -206,7 +272,6 @@ def run_digest_job(config=None):
                 
             # 计算时间衰减因子
             age_hours = parse_time_to_hours(time_text)
-            time_decay_mode = config.get("time_decay_mode", "hill")
             time_decay_half_life = config.get("time_decay_half_life", 240)
             time_decay_gravity = config.get("time_decay_gravity", 1.0)
             time_decay_slope = config.get("time_decay_slope", 2.0)
@@ -249,10 +314,78 @@ def run_digest_job(config=None):
         if page < max_pages:
             time.sleep(page_delay)
             
+    # 启用 AI 智能帖子过滤
+    if posts and config.get("ai_enabled") and config.get("ai_filter_enabled"):
+        logger.info("🤖 启用 AI 智能帖子过滤，正在发送帖子列表进行语义筛选...")
+        eval_list = [{"id": p["id"], "title": p["title"], "category": p.get("category", "日常")} for p in posts]
+        user_content = f"用户筛选标准：{config.get('ai_filter_prompt', '')}\n\n待评估的帖子列表：\n{json.dumps(eval_list, ensure_ascii=False)}"
+        system_prompt = (
+            "你是一个专业的论坛帖子过滤筛选助手。你必须根据用户设定的偏好标准评估帖子是否应该被保留。\n"
+            "你必须严格返回一个 JSON 数组，包含所有应保留的帖子 ID，例如: [\"12345\", \"67890\"]。\n"
+            "不要包含 markdown 格式标记 (如 ```json)，也不要有任何解释，只输出符合格式的纯 JSON 字符串。"
+        )
+        result = call_openai_api(config, system_prompt, user_content)
+        if result:
+            try:
+                cleaned_result = re.sub(r'^```json\s*|```\s*$', '', result, flags=re.MULTILINE).strip()
+                keep_ids = json.loads(cleaned_result)
+                if isinstance(keep_ids, list):
+                    keep_set = set(str(x) for x in keep_ids)
+                    before_count = len(posts)
+                    posts = [p for p in posts if str(p["id"]) in keep_set]
+                    logger.info(f"🤖 AI 筛选完成：从 {before_count} 个帖子中保留了 {len(posts)} 个。")
+                else:
+                    logger.warning("⚠️ AI 返回数据格式错误（非列表），跳过 AI 过滤。")
+            except Exception as e:
+                logger.warning(f"⚠️ 解析 AI 筛选结果 JSON 失败: {e} | 原始返回: {result}，跳过 AI 过滤。")
+        else:
+            logger.warning("⚠️ AI 过滤未获取到有效响应，跳过 AI 过滤。")
+
     # 去重并排序
     unique_posts = {p['id']: p for p in posts}.values()
     sorted_posts = sorted(unique_posts, key=lambda x: x['score'], reverse=True)[:push_limit]
     
+    # 针对筛选出的 Top 热帖生成 AI 摘要
+    if sorted_posts and config.get("ai_enabled") and config.get("ai_summary_enabled"):
+        logger.info(f"🤖 启用 AI 帖子摘要总结，将依次拉取正文与评论分析前 {len(sorted_posts)} 个热帖...")
+        for idx, post in enumerate(sorted_posts):
+            post_id = post["id"]
+            logger.info(f"🤖 正在分析第 {idx + 1}/{len(sorted_posts)} 个帖子: {post['title']}")
+            try:
+                details = crawl_post_details(post_id, config)
+                if "error" not in details:
+                    body_text = clean_html_to_text(details.get("content_html", ""))[:1500]
+                    comment_list = []
+                    for c in details.get("comments", [])[:5]:
+                        c_text = clean_html_to_text(c.get("content_html", ""))
+                        comment_list.append(f"- {c.get('author', '匿名')}: {c_text}")
+                    comments_text = "\n".join(comment_list)[:1500]
+                    
+                    user_content = (
+                        f"帖子标题：{post['title']}\n"
+                        f"正文内容：\n{body_text}\n\n"
+                        f"精选热评：\n{comments_text}\n\n"
+                        f"生成要求：{config.get('ai_summary_prompt', '')}"
+                    )
+                    system_prompt = "你是一个专业的内容提炼助手。请根据给出的帖子内容和评论，生成一段高密度、简练的中文摘要（通常为 1-2 句话，控制在 100 字内），严禁带有啰嗦客套话。"
+                    
+                    summary = call_openai_api(config, system_prompt, user_content)
+                    if summary:
+                        post["ai_summary"] = summary
+                        logger.info(f"🤖 摘要提炼成功: {summary}")
+                    else:
+                        post["ai_summary"] = ""
+                else:
+                    logger.warning(f"⚠️ 拉取帖子 {post_id} 详情失败，跳过摘要生成。")
+                    post["ai_summary"] = ""
+            except Exception as e:
+                logger.error(f"⚠️ 处理帖子 {post_id} 摘要提炼发生异常: {e}")
+                post["ai_summary"] = ""
+    else:
+        # 填充缺省值
+        for post in sorted_posts:
+            post["ai_summary"] = ""
+            
     # 持久化保存到本地 SQLite 数据库中（默认未推送 push_status=0）
     if sorted_posts:
         database.save_posts(sorted_posts)
@@ -268,7 +401,10 @@ def send_to_telegram(posts, token, chat_id_str):
     
     for index, post in enumerate(posts):
         html_msg += f"{index + 1}. <b><a href='{post['url']}'>{post['title']}</a></b>\n"
-        html_msg += f"    👀 {post['views']} 阅读 | 💬 {post['comments']} 评论 | 📈 热度值: <b>{post['score']}</b>\n\n"
+        html_msg += f"    👀 {post['views']} 阅读 | 💬 {post['comments']} 评论 | 📈 热度值: <b>{post['score']}</b>\n"
+        if post.get("ai_summary"):
+            html_msg += f"    🤖 <b>AI 摘要:</b> <i>{post['ai_summary']}</i>\n"
+        html_msg += "\n"
         
     # 切分可能包含的多个 ID (支持中英文逗号)
     chat_ids = [c.strip() for c in re.split(r'[,\uff0c]', str(chat_id_str)) if c.strip()]
