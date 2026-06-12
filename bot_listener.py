@@ -512,14 +512,12 @@ def _get_main_menu_data():
         ai_status = "关闭"
         
     text = (
-        "⚙️ <b>NodeSeek 自动推送系统控制大盘</b>\n\n"
-        "当前系统配置参数如下：\n"
-        f"🔹 <b>推送模式</b>：<code>{mode_text}</code>\n"
-        f"🔹 <b>调度周期</b>：<code>{schedule_detail}</code>\n"
-        f"🔹 <b>抓取页数</b>：<code>{max_pages} 页</code>\n"
-        f"🔹 <b>推送限制</b>：<code>{push_limit} 帖/次</code>\n"
-        f"🔹 <b>AI 总结/筛选</b>：<code>{ai_status}</code>\n\n"
-        "您可以通过下方按钮修改各项参数或触发手动任务。"
+        "⚙️ <b>系统配置参数</b>\n\n"
+        f"• 模式：<code>{mode_text}</code>\n"
+        f"• 周期：<code>{schedule_detail}</code>\n"
+        f"• 页数：<code>{max_pages} 页</code>\n"
+        f"• 限制：<code>{push_limit} 帖/次</code>\n"
+        f"• AI：<code>{ai_status}</code>"
     )
     
     keyboard = [
@@ -555,12 +553,10 @@ def _get_mode_menu_data():
     disabled_tag = " ✅" if current_mode == "disabled" else ""
     
     text = (
-        "⚙️ <b>配置项：推送模式调节 (Schedule Mode)</b>\n\n"
-        "更改系统的调度工作模式：\n"
-        "• <b>Cron 模式</b>：每天在固定时刻推送一次。\n"
-        "• <b>Interval 模式</b>：每隔固定小时数自动运行并推送。\n"
-        "• <b>禁用模式</b>：完全关闭后台的自动调度任务。\n\n"
-        "<i>提示：切换模式后将实时执行 scheduler.reload_scheduler() 生效。</i>"
+        "⚙️ <b>推送模式设置</b>\n\n"
+        "• Cron：每日定点推送\n"
+        "• Interval：固定间隔推送\n"
+        "• Disabled：关闭自动推送"
     )
     
     keyboard = [
@@ -580,11 +576,7 @@ def _get_time_menu_data():
     if mode == "cron":
         hour = config.get("cron_hour", 21)
         minute = config.get("cron_minute", 30)
-        text = (
-            "⚙️ <b>配置项：定时时间微调 (Cron Time)</b>\n\n"
-            f"当前的推送时间定在每日的：<b>{hour:02d}:{minute:02d}</b>\n\n"
-            "你可以点击下方按钮微调小时（步长 1）与分钟（步长 5）："
-        )
+        text = f"⚙️ <b>定时时间微调</b>\n\n当前推送时间：<b>{hour:02d}:{minute:02d}</b>"
         keyboard = [
             [
                 {"text": "小时 -1", "callback_data": "cfg:adj:ch:-1"},
@@ -598,11 +590,7 @@ def _get_time_menu_data():
         ]
     elif mode == "interval":
         hours = config.get("interval_hours", 4)
-        text = (
-            "⚙️ <b>配置项：间隔小时数微调 (Interval Hours)</b>\n\n"
-            f"当前的推送间隔为：<b>每 {hours} 小时一次</b>\n\n"
-            "你可以点击下方按钮微调间隔小时（步长 1，最小为 1 小时）："
-        )
+        text = f"⚙️ <b>推送间隔微调</b>\n\n当前推送间隔：<b>{hours} 小时</b>"
         keyboard = [
             [
                 {"text": "间隔 -1 小时", "callback_data": "cfg:adj:ih:-1"},
@@ -611,11 +599,7 @@ def _get_time_menu_data():
             [{"text": "🔙 返回主菜单", "callback_data": "cfg:menu_main"}]
         ]
     else:
-        text = (
-            "⚙️ <b>配置项：调度时间/周期微调</b>\n\n"
-            "⚠️ <b>当前自动推送处于“禁用”状态！</b>\n"
-            "在修改推送时刻或时间间隔前，请先前往「⏱️ 推送模式」页面将模式更改为 Cron 或 Interval 模式。"
-        )
+        text = "⚙️ <b>时间微调</b>\n\n⚠️ 自动推送已禁用。请先开启 Cron 或 Interval 模式。"
         keyboard = [
             [{"text": "🔙 返回主菜单", "callback_data": "cfg:menu_main"}]
         ]
@@ -627,11 +611,7 @@ def _get_pages_menu_data():
     config = database.get_config()
     max_pages = config.get("max_pages", 5)
     
-    text = (
-        "⚙️ <b>配置项：抓取页数微调 (max_pages)</b>\n\n"
-        f"当前每次抓取的页面数量为：<b>{max_pages} 页</b>\n\n"
-        "提高抓取页数可以防止漏掉冷门但有深度的帖子，但会延长运行耗时，并增加被 NodeSeek 限制的风控风险（建议设在 2 ~ 10 页之间）。"
-    )
+    text = f"⚙️ <b>抓取页数微调</b>\n\n当前每次抓取：<b>{max_pages} 页</b>"
     
     keyboard = [
         [
@@ -647,11 +627,7 @@ def _get_limit_menu_data():
     config = database.get_config()
     push_limit = config.get("push_limit", 10)
     
-    text = (
-        "⚙️ <b>配置项：单次推送限制数微调 (push_limit)</b>\n\n"
-        f"当前每次最多推送的帖子数量为：<b>{push_limit} 帖</b>\n\n"
-        "该指标限定了单次消化的高热度帖子上限，降低消息刷屏感。您可以点击按钮以 5 为步长进行微调："
-    )
+    text = f"⚙️ <b>单次推送限制数微调</b>\n\n当前每次最多推送：<b>{push_limit} 帖</b>"
     
     keyboard = [
         [
@@ -671,12 +647,8 @@ def _get_cats_menu_data():
     cats = ["日常", "技术", "情报", "测评", "交易", "拼车", "推广", "生活", "Dev", "贴图", "曝光", "内版", "沙盒"]
     
     text = (
-        "⚙️ <b>配置项：订阅板块开关 (Category Filter)</b>\n\n"
-        "点击各板块对应的状态按钮即可切换其开关状态：\n"
-        "🟢 开启订阅 (权重 >= 1.0 或默认值)\n"
-        "🟡 限制订阅 (权重在 0.0 与 1.0 之间，主要用于微降某些偏日常版块的权重)\n"
-        "🔴 关闭订阅 (权重为 0.0，将不再推送该版块下的任何帖子)\n\n"
-        "<i>注：点击🔴按钮将其切换为🟢；点击🟢或🟡按钮均将其置为🔴。</i>"
+        "⚙️ <b>订阅板块开关</b>\n\n"
+        "🟢 开启 | 🔴 关闭 | 🟡 限制"
     )
     
     keyboard = []
