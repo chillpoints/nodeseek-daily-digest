@@ -421,16 +421,16 @@ def _handle_config_callback(token, chat_id, message_id, callback_id, data_str):
             thread = threading.Thread(target=_run_digest_job_and_push, daemon=True)
             thread.start()
             
-            _answer_callback(token, callback_id, "⚡ 立即抓取已激活，正由后台递送冲击波...")
+            _answer_callback(token, callback_id, "⚡ 立即抓取已激活，正在后台执行中...")
             
             text = (
                 "⚡ <b>立即触发抓取与推送</b>\n\n"
                 "已成功在后台启动抓取推送任务！\n"
-                "系统将模拟 TRH（促甲状腺激素释放激素）刺激，直接激活靶效应：\n"
+                "系统将执行以下步骤：\n"
                 "1. 抓取最新 NodeSeek 帖子数据；\n"
-                "2. 根据当前敏感性（权重）和时间衰减模型进行综合热度计算；\n"
-                "3. 将最新精选内容推送至本 Chat。\n\n"
-                "请注意：为避免接口过载（如同受体下调），请勿频繁触发。"
+                "2. 根据板块权重和时间衰减模型计算热度得分；\n"
+                "3. 将最新精选的热帖目录推送至本 Chat。\n\n"
+                "请注意：为避免接口请求过快被风控，请勿频繁重复触发。"
             )
             keyboard = [
                 [{"text": "🔙 返回主菜单", "callback_data": "cfg:menu_main"}]
@@ -513,15 +513,13 @@ def _get_main_menu_data():
         
     text = (
         "⚙️ <b>NodeSeek 自动推送系统控制大盘</b>\n\n"
-        "当前配置稳态参数如下：\n"
+        "当前系统配置参数如下：\n"
         f"🔹 <b>推送模式</b>：<code>{mode_text}</code>\n"
         f"🔹 <b>调度周期</b>：<code>{schedule_detail}</code>\n"
         f"🔹 <b>抓取页数</b>：<code>{max_pages} 页</code>\n"
         f"🔹 <b>推送限制</b>：<code>{push_limit} 帖/次</code>\n"
         f"🔹 <b>AI 总结/筛选</b>：<code>{ai_status}</code>\n\n"
-        "🔄 配置调控如同内分泌系统的<b>负反馈调节（Negative Feedback Loop）</b>。\n"
-        "下调推送频率即如同上调下丘脑受体敏感性，能有效阻断不必要的信息流输入；而立即触发抓取，则是通过直接施加一次外源性刺激（如同促甲状腺激素释放激素 TRH 冲击），打破稳态，瞬时释放最新情报。\n\n"
-        "请选择下方靶向配置按钮进行精细调控："
+        "您可以通过下方按钮修改各项参数或触发手动任务。"
     )
     
     keyboard = [
@@ -720,10 +718,10 @@ def _get_upgrade_menu_data():
     """生成系统升级子菜单"""
     text = (
         "🔄 <b>系统自动升级与维护 (System Auto-Update)</b>\n\n"
-        "系统将通过 Git 自动拉取远程代码并进行依赖和环境自愈：\n"
+        "系统将通过 Git 自动拉取远程代码并更新运行环境：\n"
         "1. <b>拉取最新提交</b> (<code>git pull</code>)；\n"
-        "2. <b>增量热装载 Python 依赖库</b> (<code>pip install</code>)；\n"
-        "3. <b>退出当前进程</b> 触发 Systemd 定时拉起与热重载重新上线。\n\n"
+        "2. <b>增量安装 Python 依赖库</b> (<code>pip install</code>)；\n"
+        "3. <b>退出当前进程</b> 触发 Systemd 定时拉起并重新上线。\n\n"
         "⚠️ <b>注意与警告：</b>\n"
         "• 请确保没有在运行环境中对核心代码进行冲突修改，否则可能导致拉取失败。\n"
         "• 重新上线依赖于 <b>Systemd</b> 的 <code>Restart=always</code> 机制。若当前服务是以普通命令行前台执行，进程退出后需要手动拉起。"
@@ -755,7 +753,7 @@ def _run_system_upgrade(token, chat_id, message_id):
                 "❌ <b>自动升级失败 (Git Pull 错误)</b>\n\n"
                 f"在执行 <code>git pull</code> 时发生冲突或网络异常：\n"
                 f"<pre>{error_msg.strip()}</pre>\n\n"
-                "⚠️ 系统已启动代偿性保护机制，优先维持当前稳态运行，未重启进程。"
+                "⚠️ 系统未执行重启，已保持当前状态运行。"
             )
             keyboard = [[{"text": "🔙 返回主菜单", "callback_data": "cfg:menu_main"}]]
             _edit_message(token, chat_id, message_id, text, {"inline_keyboard": keyboard})
@@ -776,7 +774,7 @@ def _run_system_upgrade(token, chat_id, message_id):
                 pip_exe = p
                 break
                 
-        logger.info(f"🤖 正在执行 pip 依赖增量热装载 (使用 {pip_exe})...")
+        logger.info(f"🤖 正在执行 pip 依赖增量安装 (使用 {pip_exe})...")
         pip_res = subprocess.run([pip_exe, "install", "-r", "requirements.txt"], capture_output=True, text=True, cwd=project_dir, timeout=60)
         
         if pip_res.returncode != 0:
@@ -785,7 +783,7 @@ def _run_system_upgrade(token, chat_id, message_id):
             
         # 3. 发送重启提醒并退出进程
         text = (
-            "✅ <b>系统自动更新与自愈成功！</b>\n\n"
+            "✅ <b>系统自动更新成功！</b>\n\n"
             f"ℹ️ Git 拉取信息：\n<pre>{git_output.strip()}</pre>\n"
             "🔄 <b>进程重启就绪：</b>系统即将退出当前进程。如果您使用了 <code>deploy.sh</code> 注册的服务，Systemd 将在 5 秒内自动唤醒并拉起最新的程序版本重新连接。"
         )
@@ -802,7 +800,7 @@ def _run_system_upgrade(token, chat_id, message_id):
         text = (
             "❌ <b>系统升级遭遇严重崩溃</b>\n\n"
             f"升级线程遭遇以下内部异常：\n<code>{str(e)}</code>\n\n"
-            "⚠️ 系统已降级保护当前运行环境，未执行重启。请前往终端手动检查日志。"
+            "⚠️ 系统未执行重启，请前往终端检查运行日志。"
         )
         keyboard = [[{"text": "🔙 返回主菜单", "callback_data": "cfg:menu_main"}]]
         _edit_message(token, chat_id, message_id, text, {"inline_keyboard": keyboard})
