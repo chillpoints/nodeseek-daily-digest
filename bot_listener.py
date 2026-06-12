@@ -85,10 +85,11 @@ def _handle_callback(callback_query, token):
         tg_chat_id = str(config.get("tg_chat_id", "")).strip()
         current_chat_str = str(chat_id).strip()
         
-        # 如果 tg_chat_id 为空，我们为首次调试用户跳过鉴权并输出警示日志
+        # 支持逗号分隔的多个 ID 校验
+        allowed_ids = [x.strip() for x in re.split(r'[,\uff0c]', tg_chat_id) if x.strip()]
         if not tg_chat_id:
             logger.warning("⚠️ [TG鉴权] 数据库中 tg_chat_id 未配置。当前临时放行配置点按。")
-        elif current_chat_str != tg_chat_id:
+        elif current_chat_str not in allowed_ids:
             logger.warning(f"⚠️ [TG回调拦截] 拦截非绑定 Chat ID ({current_chat_str}) 的按钮回调。当前绑定: ({tg_chat_id})")
             _answer_callback(token, callback_id, "⚠️ 权限不足：您无权对此 Bot 进行调配。")
             return
@@ -204,9 +205,11 @@ def _handle_message(message, token):
         
         logger.info(f"🔑 [TG鉴权] 绑定 ID: '{tg_chat_id}' | 当前 ID: '{current_chat_str}'")
         
+        # 支持逗号分隔的多个 ID 校验
+        allowed_ids = [x.strip() for x in re.split(r'[,\uff0c]', tg_chat_id) if x.strip()]
         if not tg_chat_id:
             logger.warning("⚠️ [TG鉴权] 数据库中 tg_chat_id 为空。当前临时放行所有控制大盘及指令。")
-        elif current_chat_str != tg_chat_id:
+        elif current_chat_str not in allowed_ids:
             logger.warning(f"⚠️ [TG拦截] 拦截到非绑定 Chat ID ({current_chat_str}) 的指令请求。当前绑定: ({tg_chat_id})")
             return
             
