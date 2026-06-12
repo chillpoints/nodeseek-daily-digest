@@ -53,7 +53,8 @@ def init_db():
         "interval_hours": "4",
         "crawler_engine": "curl_cffi", # 'curl_cffi', 'playwright'
         "page_delay": "2",             # 防风控间隔 (秒)
-        "verbose_log": "0"             # 是否开启详细日志 (0-关闭, 1-开启)
+        "verbose_log": "0",            # 是否开启详细日志 (0-关闭, 1-开启)
+        "blocked_uids": ""             # 拉黑过滤特定发帖人 UID (以逗号分隔)
     }
     
     for k, v in default_config.items():
@@ -78,6 +79,8 @@ def get_config():
             config[key] = int(val) if val.isdigit() else 0
         elif key == "verbose_log":
             config[key] = (val == "1" or val.lower() == "true")
+        elif key == "blocked_uids":
+            config[key] = [x.strip() for x in val.split(",") if x.strip()]
         else:
             config[key] = val
     return config
@@ -86,10 +89,10 @@ def update_config(new_config):
     with db_lock:
         conn = get_db()
         cursor = conn.cursor()
-    for k, v in new_config.items():
-        if k == "lucky_keywords" and isinstance(v, list):
-            v = ",".join(v)
-        cursor.execute("INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)", (k, str(v)))
+        for k, v in new_config.items():
+            if k in ["lucky_keywords", "blocked_uids"] and isinstance(v, list):
+                v = ",".join(v)
+            cursor.execute("INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)", (k, str(v)))
     conn.commit()
     conn.close()
 

@@ -699,6 +699,10 @@
                             </select>
                         </div>
                         <div class="form-group">
+                            <label for="blocked_uids">拉黑过滤特定发帖人 UID (以逗号分隔)</label>
+                            <textarea class="form-control" id="blocked_uids" placeholder="例如: 23675, 10086"></textarea>
+                        </div>
+                        <div class="form-group">
                             <label for="lucky_keywords">抽奖无意义帖过滤词 (以逗号分隔)</label>
                             <textarea class="form-control" id="lucky_keywords"></textarea>
                         </div>
@@ -788,6 +792,7 @@
             document.getElementById('max_pages').value = data.max_pages || 5;
             document.getElementById('page_delay').value = data.page_delay !== undefined ? data.page_delay : 2;
             document.getElementById('verbose_log').value = data.verbose_log ? 'true' : 'false';
+            document.getElementById('blocked_uids').value = (data.blocked_uids || []).join(', ');
             document.getElementById('lucky_keywords').value = (data.lucky_keywords || []).join(', ');
             
             // Set Dashboard indicators
@@ -816,6 +821,11 @@
             .split(',')
             .map(x => x.strip ? x.strip() : x.trim())
             .filter(Boolean);
+
+        const blockedUids = document.getElementById('blocked_uids').value
+            .split(',')
+            .map(x => x.strip ? x.strip() : x.trim())
+            .filter(Boolean);
             
         const cfg = {
             tg_bot_token: document.getElementById('tg_bot_token').value.trim(),
@@ -824,6 +834,7 @@
             cookie: document.getElementById('cookie').value.trim(),
             max_pages: parseInt(document.getElementById('max_pages').value) || 5,
             lucky_keywords: keywords,
+            blocked_uids: blockedUids,
             schedule_mode: document.getElementById('schedule_mode').value,
             cron_hour: parseInt(document.getElementById('cron_hour').value) || 0,
             cron_minute: parseInt(document.getElementById('cron_minute').value) || 0,

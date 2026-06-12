@@ -105,6 +105,7 @@ def run_digest_job(config=None):
     max_pages = config["max_pages"]
     lucky_keywords = config["lucky_keywords"]
     page_delay = config.get("page_delay", 2)
+    blocked_uids = config.get("blocked_uids", [])
     
     verbose = config.get("verbose_log", False)
     posts = []
@@ -131,7 +132,22 @@ def run_digest_job(config=None):
             post_id_match = re.search(r'post-(\d+)', href)
             post_id = post_id_match.group(1) if post_id_match else ""
             
-            # 1. 过滤抽奖灌水帖
+            # 提取发帖人 UID
+            uid = ""
+            author_el = item.select_one('a[href^="/space/"]')
+            if author_el:
+                author_href = author_el.get('href', '')
+                uid_match = re.search(r'/space/(\d+)', author_href)
+                if uid_match:
+                    uid = uid_match.group(1)
+            
+            # 1. 过滤特定发帖人 UID
+            if uid and uid in blocked_uids:
+                if verbose:
+                    logger.info(f"🚫 过滤黑名单用户帖子: UID={uid} | 标题={title}")
+                continue
+                
+            # 2. 过滤抽奖灌水帖
             if any(kw in title.lower() for kw in lucky_keywords):
                 if verbose:
                     logger.info(f"🚫 过滤抽奖贴: {title}")

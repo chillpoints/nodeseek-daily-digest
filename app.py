@@ -53,6 +53,7 @@ class ConfigSchema(BaseModel):
     crawler_engine: str
     page_delay: int
     verbose_log: bool
+    blocked_uids: list
 
 @app.on_event("startup")
 def on_startup():
