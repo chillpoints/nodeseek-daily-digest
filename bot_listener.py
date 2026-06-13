@@ -275,6 +275,10 @@ def _handle_message(message, token):
         elif text.startswith("/stars"):
             logger.info("⭐ 匹配到 /stars 指令，开始获取收藏列表")
             _send_stars_list(token, chat_id, page=1)
+        elif text.startswith("/daily"):
+            logger.info("📅 匹配到 /daily 指令，开始生成24小时热帖的 Markdown 打包文件")
+            thread = threading.Thread(target=_run_send_daily_digest, args=(token, chat_id), daemon=True)
+            thread.start()
         elif text.startswith("/content"):
             logger.info(f"📖 匹配到 /content 详情请求: {text}")
             content_match = re.search(r'/content(?:_|-|#)?(\d+)', text)
@@ -869,6 +873,240 @@ def clean_html_to_text(html_content):
     from bs4 import BeautifulSoup
     soup = BeautifulSoup(html_content, 'html.parser')
     return soup.get_text(separator="\n", strip=True)
+
+def html_to_markdown(html_content):
+    """将 HTML 格式的内容转换为 Markdown 格式文本"""
+    if not html_content:
+        return ""
+    from bs4 import BeautifulSoup
+    soup = BeautifulSoup(html_content, 'html.parser')
+    
+    def _convert(node):
+        if node.name is None:
+            # 文本节点
+            return node.string if node.string else ""
+            
+        tag = node.name.lower()
+        
+        # 1. 预格式化代码块 (pre)
+        if tag == 'pre':
+            code_el = node.find('code')
+            code_text = code_el.get_text() if code_el else node.get_text()
+            return f"\n\n```\n{code_text}\n```\n\n"
+            
+        # 2. 行内代码 (code)
+        if tag == 'code':
+            return f" `{node.get_text()}` "
+            
+        # 3. 先递归处理子节点
+        parts = []
+        for child in node.children:
+            # 过滤列表/表格中的空白文本节点，避免空行堆叠
+            if tag in ['ul', 'ol', 'table', 'tr', 'thead', 'tbody'] and child.name is None:
+                if not child.string or not child.string.strip():
+                    continue
+            parts.append(_convert(child))
+        inner = "".join(parts)
+        
+        # 4. 根据标签类型生成 markdown
+        if tag == 'p':
+            return f"\n\n{inner.strip()}\n\n"
+        elif tag == 'br':
+            return "\n"
+        elif tag in ['strong', 'b']:
+            return f"**{inner}**"
+        elif tag in ['em', 'i']:
+            return f"*{inner}*"
+        elif tag in ['del', 's']:
+            return f"~~{inner}~~"
+        elif tag == 'a':
+            href = node.get('href', '')
+            txt = inner.strip()
+            if not txt:
+                return href
+            return f"[{txt}]({href})"
+        elif tag == 'img':
+            src = node.get('src', '')
+            alt = node.get('alt', '图片')
+            return f"\n![{alt}]({src})\n"
+        elif tag in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
+            level = int(tag[1])
+            return f"\n\n{'#' * level} {inner.strip()}\n\n"
+        elif tag == 'blockquote':
+            lines = inner.strip().split('\n')
+            quoted = [f"> {line}" for line in lines]
+            return f"\n\n" + "\n".join(quoted) + "\n\n"
+        elif tag == 'li':
+            parent = node.parent
+            if parent and parent.name.lower() == 'ol':
+                siblings = [c for c in parent.children if c.name and c.name.lower() == 'li']
+                try:
+                    idx = siblings.index(node) + 1
+                except ValueError:
+                    idx = 1
+                return f"\n{idx}. {inner.strip()}"
+            else:
+                return f"\n* {inner.strip()}"
+        elif tag in ['ul', 'ol']:
+            return f"\n{inner}\n"
+        elif tag == 'tr':
+            return f"\n| {inner} |"
+        elif tag in ['td', 'th']:
+            return f" {inner} |"
+        else:
+            return inner
+
+    result = _convert(soup)
+    # 替换连续的多个换行为双换行
+    result = re.sub(r'\n{3,}', '\n\n', result)
+    return result.strip()
+
+def clean_anchor(title):
+    """格式化标题以生成 Markdown 锚点链接"""
+    s = title.lower()
+    # 保留字母、数字、中文和连字符，其余替换为空
+    s = re.sub(r'[^\w\s\u4e00-\u9fff-]', '', s)
+    # 替换空格和下划线为连字符
+    s = re.sub(r'[\s_]+', '-', s)
+    return s.strip('-')
+
+def _run_send_daily_digest(token, chat_id):
+    """在后台线程收集过去 24 小时内的所有热帖内容，转为 Markdown 后打包发送给用户"""
+    logger.info("📅 开始生成24小时热帖打包 Markdown 文件...")
+    _send_message(token, chat_id, "🔍 正在为您收集并打包过去 24 小时内的所有热帖详情（包含文字、图片与前 10 条评论），这需要一些时间，请稍候...")
+    
+    try:
+        from datetime import datetime
+        # 获取过去 24 小时热度前 100 的帖子
+        posts = database.get_recent_hot_posts(hours=24, limit=100)
+        if not posts:
+            _send_message(token, chat_id, "ℹ️ 过去 24 小时内未检测到任何热帖。")
+            return
+            
+        config = database.get_config()
+        nodeseek_url = config.get("nodeseek_url", "https://www.nodeseek.com")
+        
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        md_content = f"# 🔥 NodeSeek 过去 24 小时热帖打包订阅\n"
+        md_content += f"- **生成时间**: {now_str}\n"
+        md_content += f"- **帖子总数**: {len(posts)} 个\n\n"
+        md_content += "---\n\n"
+        
+        # 生成目录
+        md_content += "## 目录\n"
+        for idx, post in enumerate(posts):
+            anchor = f"{post['id']}-{clean_anchor(post['title'])}"
+            md_content += f"{idx + 1}. [{post['title']}](#{anchor}) (🔥 热度: {post['score']})\n"
+        md_content += "\n---\n\n"
+        
+        import nodeseek_digest
+        
+        for idx, post in enumerate(posts):
+            post_id = post["id"]
+            title = post["title"]
+            url = post["url"]
+            views = post["views"]
+            comments_count = post["comments"]
+            score = post["score"]
+            ai_summary = post.get("ai_summary", "")
+            
+            logger.info(f"正在拉取第 {idx+1}/{len(posts)} 个帖子详情: ID={post_id}, 标题={title}")
+            
+            details = nodeseek_digest.crawl_post_details(post_id, config)
+            if "error" in details:
+                anchor = f"{post_id}-{clean_anchor(title)}"
+                md_content += f"## <a name=\"{anchor}\"></a> {idx + 1}. {title}\n\n"
+                md_content += f"- **链接**: [{url}]({url})\n"
+                md_content += f"- **数据**: 👀 {views} 阅读 | 💬 {comments_count} 评论 | 📈 热度 {score}\n\n"
+                md_content += f"⚠️ **内容获取失败**: {details['error']}\n\n"
+                md_content += "---\n\n"
+                continue
+                
+            poster_name = details.get("poster_name", "未知")
+            content_html = details.get("content_html", "")
+            comments = details.get("comments", [])
+            
+            # 转换正文为 Markdown
+            body_md = html_to_markdown(content_html)
+            
+            # 提取正文插图 URL
+            from bs4 import BeautifulSoup
+            soup = BeautifulSoup(content_html, 'html.parser')
+            images = []
+            for img in soup.find_all('img'):
+                src = img.get('src')
+                if src:
+                    if "emoji" in src or "avatar" in src or "/static/image/common/" in src:
+                        continue
+                    if src.startswith("/"):
+                        src = nodeseek_url + src
+                    images.append(src)
+            
+            anchor = f"{post_id}-{clean_anchor(title)}"
+            md_content += f"## <a name=\"{anchor}\"></a> {idx + 1}. {title}\n\n"
+            md_content += f"- **作者**: {poster_name}\n"
+            md_content += f"- **链接**: [{url}]({url})\n"
+            md_content += f"- **数据**: 👀 {views} 阅读 | 💬 {comments_count} 评论 | 📈 热度 {score}\n"
+            if ai_summary:
+                md_content += f"- **AI 摘要**: {ai_summary}\n"
+            md_content += "\n"
+            
+            md_content += "### 📝 正文内容\n\n"
+            if body_md:
+                md_content += body_md + "\n\n"
+            else:
+                md_content += "*（正文无文字）*\n\n"
+                
+            if images:
+                md_content += "### 🖼️ 图片列表\n\n"
+                for i, img in enumerate(images):
+                    md_content += f"- ![图片 {i+1}]({img})\n"
+                md_content += "\n"
+                
+            md_content += "### 💬 热门评论 (前 10 条)\n\n"
+            top_comments = comments[:10]
+            if top_comments:
+                for c in top_comments:
+                    c_floor = c.get("floor", "")
+                    c_author = c.get("author", "匿名")
+                    c_content_html = c.get("content_html", "")
+                    c_md = html_to_markdown(c_content_html)
+                    # 引用格式化评论
+                    quoted_c = "\n".join([f"> {line}" for line in c_md.strip().split("\n")])
+                    md_content += f"**{c_floor} {c_author}**:\n{quoted_c}\n\n"
+            else:
+                md_content += "*（暂无评论）*\n\n"
+                
+            md_content += "---\n\n"
+            
+            # 延迟 1 秒防风控
+            time.sleep(1)
+            
+        # 发送 Markdown 打包文件
+        file_date = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"NodeSeek_Daily_Digest_{file_date}.md"
+        markdown_bytes = md_content.encode("utf-8")
+        
+        url = f"https://api.telegram.org/bot{token}/sendDocument"
+        from curl_cffi import CurlMime
+        mp = CurlMime()
+        mp.addpart(name="chat_id", data=str(chat_id).encode("utf-8"))
+        caption = f"📅 <b>NodeSeek 24 小时热帖打包成功！</b>\n\n📊 共收录 <b>{len(posts)}</b> 个热帖详情。"
+        mp.addpart(name="caption", data=caption.encode("utf-8"))
+        mp.addpart(name="parse_mode", data=b"HTML")
+        mp.addpart(name="document", content_type="text/markdown", filename=filename, data=markdown_bytes)
+        
+        res = requests.post(url, multipart=mp, impersonate="chrome120", timeout=30)
+        if res.status_code == 200:
+            logger.info("🎉 24小时热帖打包文件已成功发送。")
+        else:
+            logger.error(f"❌ 发送打包文件失败，TG 响应: {res.text}")
+            _send_message(token, chat_id, f"❌ 发送打包文件失败，TG 响应: <code>{res.text}</code>")
+            
+    except Exception as e:
+        logger.error(f"❌ 生成或发送24小时热帖打包 Markdown 发生异常: {e}")
+        _send_message(token, chat_id, f"❌ 生成打包文件失败，异常: <code>{str(e)}</code>")
+
 
 def _send_stars_list(token, chat_id, page=1):
     """向用户发送其收藏的帖子列表"""
