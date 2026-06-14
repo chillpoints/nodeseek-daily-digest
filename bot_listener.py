@@ -142,16 +142,23 @@ def _handle_callback(callback_query, token):
                 _answer_callback(token, callback_id, "⚠️ 数据库中没有此发帖人的 UID，无法屏蔽。")
                 return
                 
-            blocked_uids = config.get("blocked_uids", [])
+            author_uid = str(author_uid)
+            blocked_uids = [str(x) for x in config.get("blocked_uids", [])]
+            is_blocking = False
+            
             if author_uid not in blocked_uids:
                 blocked_uids.append(author_uid)
                 database.update_config({"blocked_uids": blocked_uids})
                 alert_msg = f"🚫 已成功屏蔽该作者 (UID: {author_uid})！"
+                is_blocking = True
             else:
-                alert_msg = f"ℹ️ 该作者 (UID: {author_uid}) 之前已被屏蔽。"
+                blocked_uids.remove(author_uid)
+                database.update_config({"blocked_uids": blocked_uids})
+                alert_msg = f"✅ 已成功取消屏蔽该作者 (UID: {author_uid})！"
+                is_blocking = False
                 
             _answer_callback(token, callback_id, alert_msg)
-            _update_message_block_button(token, chat_id, message_id, callback_query.get("message", {}).get("reply_markup"), data_str)
+            _update_message_block_button(token, chat_id, message_id, callback_query.get("message", {}).get("reply_markup"), data_str, is_blocking)
             return
             
     except Exception as e:
@@ -209,8 +216,8 @@ def _update_message_star_button(token, chat_id, message_id, reply_markup, clicke
         except Exception as e:
             logger.error(f"❌ 更新原消息键盘失败: {e}")
 
-def _update_message_block_button(token, chat_id, message_id, reply_markup, clicked_data):
-    """点击屏蔽后，将被点击按钮设为已屏蔽状态，禁用该按钮"""
+def _update_message_block_button(token, chat_id, message_id, reply_markup, clicked_data, is_blocking):
+    """点击屏蔽后，将被点击按钮设为对应状态（已屏蔽 🚫 或 🚫 #x 屏蔽），保持可用"""
     if not reply_markup or "inline_keyboard" not in reply_markup:
         return
         
@@ -218,13 +225,24 @@ def _update_message_block_button(token, chat_id, message_id, reply_markup, click
     updated = False
     
     for row in inline_keyboard:
+        target_btn = None
+        number = None
         for btn in row:
-            if btn.get("callback_data") == clicked_data:
-                btn["text"] = "已屏蔽 🚫"
-                btn["callback_data"] = "disabled:action"
-                updated = True
-                break
-        if updated:
+            cb_data = btn.get("callback_data", "")
+            if cb_data.startswith("star:") or cb_data.startswith("content:"):
+                match = re.search(r'#(\d+)', btn.get("text", ""))
+                if match:
+                    number = match.group(1)
+            if cb_data == clicked_data:
+                target_btn = btn
+                
+        if target_btn:
+            if is_blocking:
+                target_btn["text"] = "已屏蔽 🚫"
+            else:
+                num_str = number if number else "1"
+                target_btn["text"] = f"🚫 #{num_str} 屏蔽"
+            updated = True
             break
             
     if updated:
